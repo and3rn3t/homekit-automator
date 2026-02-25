@@ -215,8 +215,6 @@ struct AutomationList: AsyncParsableCommand {
         if json {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(["automations": automations, "total": automations.count] as [String: Any])
-            // Simplified: just encode the automations array
             let jsonData = try encoder.encode(automations)
             print(String(data: jsonData, encoding: .utf8) ?? "[]")
             return

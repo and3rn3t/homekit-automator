@@ -41,7 +41,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Logging", package: "swift-log"),
             ],
-            path: "Sources/homekitauto"
+            path: "Sources/homekitauto",
+            swiftSettings: [
+                .unsafeFlags(["-parse-as-library"])
+            ]
         ),
 
         // Main app target — SwiftUI menu bar application (future)

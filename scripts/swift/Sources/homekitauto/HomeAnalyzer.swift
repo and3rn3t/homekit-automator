@@ -113,7 +113,7 @@ struct HomeAnalyzer {
             }
         }
 
-        let existingNames = Set(existingAutomations.map { $0.name.lowercased() })
+        let existingNames = Swift.Set(existingAutomations.map { $0.name.lowercased() })
 
         // MARK: Security Suggestions
         /// Suggests security-focused automations: nighttime locks and garage door closures.

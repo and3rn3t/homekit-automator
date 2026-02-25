@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:homekit-automator}/scripts/swift",
+            "name": "Debug homekitauto (scripts/swift)",
+            "target": "homekitauto",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug homekitauto (scripts/swift)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:homekit-automator}/scripts/swift",
+            "name": "Release homekitauto (scripts/swift)",
+            "target": "homekitauto",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release homekitauto (scripts/swift)"
+        }
+    ]
+}
