@@ -1,0 +1,50 @@
+{
+  "name": "homekit-automator",
+  "version": "1.0.0",
+  "description": "Smart HomeKit automation with natural language — control devices, create automations registered as Apple Shortcuts, get energy insights and suggestions",
+  "author": "homekit-automator",
+  "license": "MIT",
+  "homepage": "https://github.com/homekit-automator/homekit-automator",
+  "platforms": ["macos"],
+  "minOsVersion": "14.0",
+  "skills": [
+    {
+      "name": "homekit-automator",
+      "path": "../../SKILL.md"
+    }
+  ],
+  "mcpServers": [
+    {
+      "name": "homekit-automator",
+      "command": "node",
+      "args": ["../mcp-server/index.js"],
+      "description": "HomeKit device control and automation via MCP"
+    }
+  ],
+  "bins": {
+    "homekitauto": {
+      "description": "HomeKit Automator CLI — device control, automation management, and home intelligence",
+      "installInstructions": "Build from source: cd scripts/swift && swift build -c release, then copy .build/release/homekitauto to /usr/local/bin/",
+      "platforms": {
+        "macos": {
+          "source": "scripts/swift/.build/release/homekitauto"
+        }
+      }
+    }
+  },
+  "requirements": {
+    "runtime": ["node>=20"],
+    "build": ["swift>=6.0", "xcodegen"],
+    "system": ["macos>=14.0"],
+    "entitlements": ["com.apple.developer.homekit"]
+  },
+  "tags": [
+    "homekit",
+    "apple",
+    "smart-home",
+    "automation",
+    "shortcuts",
+    "iot",
+    "macos"
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  // HomeKit Automator VS Code Settings
+
+  // === Editor Settings ===
+  "editor.formatOnSave": true,
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.rulers": [120],
+  "editor.trimAutoWhitespace": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // === File Associations ===
+  "files.associations": {
+    "Package.swift": "swift",
+    "project.yml": "yaml",
+    "*.entitlements": "xml"
+  },
+
+  // === Swift Settings ===
+  "swift.path": "/usr/bin",
+  "swift.buildPath": "scripts/swift",
+  "sourcekit-lsp.serverPath": "/usr/bin/sourcekit-lsp",
+
+  // === JavaScript Settings ===
+  "[javascript]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.tabSize": 2,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // === YAML Settings ===
+  "[yaml]": {
+    "editor.tabSize": 2
+  },
+
+  // === Markdown Settings ===
+  "[markdown]": {
+    "editor.tabSize": 2,
+    "files.trimTrailingWhitespace": false
+  },
+
+  // === Shell Script Settings ===
+  "[shellscript]": {
+    "editor.tabSize": 2
+  },
+
+  // === File Excludes (hide clutter) ===
+  "files.exclude": {
+    "**/.DS_Store": true,
+    "**/._*": true,
+    "scripts/swift/.build": true,
+    "scripts/swift/.swiftpm": true
+  },
+
+  // === Search Excludes ===
+  "search.exclude": {
+    "scripts/swift/.build": true,
+    "scripts/swift/.swiftpm": true,
+    "**/node_modules": true
+  },
+
+  // === Recommended Extensions ===
+  // See .vscode/extensions.json for the full list
+
+  // === Terminal Settings ===
+  "terminal.integrated.cwd": "${workspaceFolder}"
+}

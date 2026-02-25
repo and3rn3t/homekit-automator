@@ -1,0 +1,80 @@
+# HomeKit Automator .gitignore
+
+# === Build artifacts ===
+scripts/swift/.build/
+scripts/swift/Sources/HomeKitHelper/HomeKitHelper.xcodeproj/
+scripts/swift/Sources/HomeKitHelper/DerivedData/
+scripts/swift/Sources/HomeKitAutomator/DerivedData/
+
+# === Environment and secrets ===
+.env.local
+.env.*.local
+
+# === macOS ===
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# === Xcode ===
+*.xcuserstate
+*.xcworkspace
+!*.xcworkspace/contents.xcworkspacedata
+**/xcuserdata/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+!default.pbxuser
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+*.hmap
+*.xccheckout
+*.xcscmblueprint
+
+# === Swift Package Manager ===
+.swiftpm/
+Packages/
+Package.resolved
+
+# === Node.js ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+
+# === IDE ===
+.idea/
+*.swp
+*.swo
+*~
+
+# === VS Code (keep workspace settings, ignore user-specific) ===
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# === Testing artifacts ===
+*.coverage
+.coverage/
+htmlcov/
+
+# === Application bundles (built, not source) ===
+*.app
+!scripts/swift/Sources/HomeKitHelper/*.app
+
+# === Logs and databases ===
+*.log
+*.sqlite
+*.sqlite3

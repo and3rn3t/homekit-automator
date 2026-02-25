@@ -1,0 +1,23 @@
+{
+  "skill_name": "homekit-automator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Turn off all the lights in the kitchen",
+      "expected_output": "The skill should call device_control to set power=false on kitchen lights. Should first call home_discover if device map isn't cached.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Set up a morning routine that turns on my kitchen lights to 60% brightness and sets the thermostat to 72 degrees every weekday at 6:45am",
+      "expected_output": "The skill should parse this into an automation_create call with: schedule trigger (cron: '45 6 * * 1-5'), two actions (kitchen lights brightness 60, thermostat targetTemp 72). Should confirm with user before creating. Should mention the Apple Shortcut registration.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "What automations do I have set up? Can you also suggest some new ones based on my devices?",
+      "expected_output": "Should call automation_list followed by home_suggest. Should present existing automations clearly, then offer relevant suggestions based on discovered devices.",
+      "files": []
+    }
+  ]
+}

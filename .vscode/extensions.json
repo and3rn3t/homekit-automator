@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "sswg.swift-lang",
+    "esbenp.prettier-vscode",
+    "redhat.vscode-yaml",
+    "timonwong.shellcheck",
+    "EditorConfig.EditorConfig",
+    "DavidAnson.vscode-markdownlint"
+  ],
+  "unwantedRecommendations": []
+}

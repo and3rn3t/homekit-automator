@@ -1,0 +1,40 @@
+# XcodeGen project specification for HomeKitHelper
+# This generates an Xcode project for the Mac Catalyst helper that accesses HomeKit.
+# Build with: cd Sources/HomeKitHelper && xcodegen && open HomeKitHelper.xcodeproj
+
+name: HomeKitHelper
+options:
+  bundleIdPrefix: com.homekitautomator
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  supportedDestinations: [iOS, macCatalyst]
+
+settings:
+  base:
+    SUPPORTS_MACCATALYST: YES
+    DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: NO
+    PRODUCT_BUNDLE_IDENTIFIER: com.homekitautomator.helper
+    INFOPLIST_FILE: Info.plist
+    CODE_SIGN_ENTITLEMENTS: HomeKitHelper.entitlements
+    DEVELOPMENT_TEAM: "${HOMEKIT_TEAM_ID}"
+
+targets:
+  HomeKitHelper:
+    type: application
+    platform: iOS
+    supportedDestinations: [iOS, macCatalyst]
+    sources:
+      - path: .
+        excludes:
+          - project.yml
+          - "*.entitlements"
+          - Info.plist
+    settings:
+      base:
+        SUPPORTS_MACCATALYST: YES
+        PRODUCT_NAME: HomeKitHelper
+        TARGETED_DEVICE_FAMILY: "2,6"   # iPad + Mac Catalyst
+        ENABLE_HARDENED_RUNTIME: YES
+    entitlements:
+      path: HomeKitHelper.entitlements

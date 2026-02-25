@@ -1,0 +1,126 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build CLI (Debug)",
+      "type": "shell",
+      "command": "swift",
+      "args": ["build"],
+      "options": {
+        "cwd": "${workspaceFolder}/scripts/swift"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$swiftc",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build CLI (Release)",
+      "type": "shell",
+      "command": "swift",
+      "args": ["build", "-c", "release"],
+      "options": {
+        "cwd": "${workspaceFolder}/scripts/swift"
+      },
+      "group": "build",
+      "problemMatcher": "$swiftc"
+    },
+    {
+      "label": "Build All (Debug)",
+      "type": "shell",
+      "command": "./scripts/build.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build All (Release + Install)",
+      "type": "shell",
+      "command": "./scripts/build.sh",
+      "args": ["--release", "--install"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests",
+      "type": "shell",
+      "command": "swift",
+      "args": ["test"],
+      "options": {
+        "cwd": "${workspaceFolder}/scripts/swift"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": "$swiftc"
+    },
+    {
+      "label": "Clean Build",
+      "type": "shell",
+      "command": "./scripts/build.sh",
+      "args": ["--clean"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run CLI (Status)",
+      "type": "shell",
+      "command": ".build/debug/homekitauto",
+      "args": ["status"],
+      "options": {
+        "cwd": "${workspaceFolder}/scripts/swift"
+      },
+      "group": "none",
+      "problemMatcher": [],
+      "dependsOn": "Build CLI (Debug)"
+    },
+    {
+      "label": "Run SwiftLint",
+      "type": "shell",
+      "command": "swiftlint",
+      "args": ["lint", "--config", ".swiftlint.yml"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "test",
+      "problemMatcher": {
+        "owner": "swiftlint",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+): (warning|error): (.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "Start MCP Server",
+      "type": "shell",
+      "command": "node",
+      "args": ["index.js"],
+      "options": {
+        "cwd": "${workspaceFolder}/scripts/mcp-server"
+      },
+      "group": "none",
+      "problemMatcher": [],
+      "isBackground": true
+    }
+  ]
+}
