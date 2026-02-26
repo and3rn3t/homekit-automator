@@ -140,6 +140,15 @@ struct ShortcutGenerator {
     ///   - path: File URL pointing to the .shortcut plist file
     /// - Returns: True if import succeeded, false otherwise
     func importShortcut(name: String, path: URL) async throws -> Bool {
+        // Check if a shortcut with this name already exists
+        if await ShortcutGenerator.shortcutExists(name: name) {
+            print("⚠️  Warning: Shortcut '\(name)' already exists. It will be overwritten.")
+            let deleted = await ShortcutGenerator.deleteShortcut(name: name)
+            if !deleted {
+                print("⚠️  Warning: Failed to delete existing shortcut '\(name)'. Import may conflict.")
+            }
+        }
+
         // Method 1: Use the `shortcuts` CLI tool (macOS 12+)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")

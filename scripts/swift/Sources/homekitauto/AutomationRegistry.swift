@@ -21,9 +21,13 @@ import Foundation
 /// All data is stored as JSON and persisted atomically to prevent corruption. Directories are
 /// created on demand if they do not exist.
 struct AutomationRegistry {
-    private let configDirPath = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config")
-        .appendingPathComponent("homekit-automator")
+    private let configDirPath: URL
+
+    init(configDir: URL? = nil) {
+        self.configDirPath = configDir ?? FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config")
+            .appendingPathComponent("homekit-automator")
+    }
 
     /// Ensures the config directory (~/.config/homekit-automator) exists, creating intermediate
     /// directories if necessary.
@@ -81,6 +85,9 @@ struct AutomationRegistry {
     ///   write fails.
     func save(_ automation: RegisteredAutomation) throws {
         var all = try loadAll()
+        if all.contains(where: { $0.name.lowercased() == automation.name.lowercased() }) {
+            throw RegistryError.duplicateName(automation.name)
+        }
         all.append(automation)
         try persist(all)
     }
@@ -96,6 +103,9 @@ struct AutomationRegistry {
         guard let index = all.firstIndex(where: { $0.id == automation.id }) else {
             throw RegistryError.notFound(automation.id)
         }
+        if all.contains(where: { $0.id != automation.id && $0.name.lowercased() == automation.name.lowercased() }) {
+            throw RegistryError.duplicateName(automation.name)
+        }
         all[index] = automation
         try persist(all)
     }
@@ -108,6 +118,9 @@ struct AutomationRegistry {
     ///   updated registry cannot be encoded; `FileManager` errors if file write fails.
     func delete(_ id: String) throws {
         var all = try loadAll()
+        guard all.contains(where: { $0.id == id }) else {
+            throw RegistryError.notFound(id)
+        }
         all.removeAll { $0.id == id }
         try persist(all)
     }

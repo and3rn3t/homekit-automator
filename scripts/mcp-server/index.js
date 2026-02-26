@@ -318,9 +318,9 @@ async function handleTool(name, args) {
       return await runCli(["discover"]);
 
     case "device_status":
-      // Maps to: homekitauto get <device> --json  OR  homekitauto rooms --home <room> --json
+      // Maps to: homekitauto get <device> --json  OR  homekitauto rooms --json
       if (args.device) return await runCli(["get", args.device]);
-      if (args.room) return await runCli(["rooms", "--home", args.room]);
+      if (args.room) return await runCli(["rooms"]);
       throw new Error("Provide either device or room parameter");
 
     case "device_control":
@@ -334,12 +334,12 @@ async function handleTool(name, args) {
     // ── Automation CRUD Tools ──
 
     case "automation_create":
-      // Maps to: homekitauto automation create --json '<full automation definition>'
+      // Maps to: homekitauto automation create --definition '<full automation definition>'
       // The entire args object (name, trigger, conditions, actions) is serialized as JSON
       return await runCli([
         "automation",
         "create",
-        "--json",
+        "--definition",
         JSON.stringify(args),
       ]);
 

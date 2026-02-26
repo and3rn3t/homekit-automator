@@ -10,6 +10,44 @@
 import ArgumentParser
 import Foundation
 
+// MARK: - Temperature Conversion Helpers
+
+/// Convert a temperature from Celsius to Fahrenheit.
+/// Formula: F = C × 9/5 + 32
+func celsiusToFahrenheit(_ c: Double) -> Double {
+    return c * 9.0 / 5.0 + 32.0
+}
+
+/// Convert a temperature from Fahrenheit to Celsius.
+/// Formula: C = (F − 32) × 5/9
+func fahrenheitToCelsius(_ f: Double) -> Double {
+    return (f - 32.0) * 5.0 / 9.0
+}
+
+/// Temperature unit preference for display and input.
+enum TemperatureUnit: String, ExpressibleByArgument, CaseIterable {
+    case celsius
+    case fahrenheit
+}
+
+/// Determines the default temperature unit based on the system locale.
+/// Returns `.fahrenheit` for locales that use the US measurement system, `.celsius` otherwise.
+private func defaultTemperatureUnit() -> TemperatureUnit {
+    if #available(macOS 13, *) {
+        return Locale.current.measurementSystem == .us ? .fahrenheit : .celsius
+    } else {
+        return Locale.current.usesMetricSystem ? .celsius : .fahrenheit
+    }
+}
+
+/// The set of HomeKit characteristic keys that represent temperature values (always stored in Celsius).
+private let temperatureCharacteristics: Swift.Set<String> = [
+    "current-temperature", "currentTemperature",
+    "target-temperature", "targetTemperature",
+    "heating-threshold", "heatingThreshold",
+    "cooling-threshold", "coolingThreshold"
+]
+
 /// Retrieves and displays the current state of a HomeKit device.
 ///
 /// This command queries the socket bridge for the complete state of a device,
@@ -36,6 +74,11 @@ struct Get: AsyncParsableCommand {
     /// When true, returns device state as formatted JSON instead of human-readable text
     @Flag(name: .long, help: "Output as JSON")
     var json = false
+
+    /// Temperature unit for displaying temperature values (celsius or fahrenheit).
+    /// Defaults to the system locale's measurement system.
+    @Option(name: .long, help: "Temperature unit for display: celsius or fahrenheit (default: system locale)")
+    var units: TemperatureUnit?
 
     /// Queries the socket bridge for device state and displays it
     func run() async throws {
@@ -74,9 +117,20 @@ struct Get: AsyncParsableCommand {
         print("Status: \(reachable ? "Reachable" : "Offline")")
 
         // Display all characteristics sorted alphabetically
+        let displayUnit = units ?? defaultTemperatureUnit()
         if let state = data["state"]?.dictionaryValue {
             for (key, value) in state.sorted(by: { $0.key < $1.key }) {
-                print("  \(key): \(value)")
+                if temperatureCharacteristics.contains(key),
+                   let tempC = value.doubleValue ?? value.intValue.map(Double.init) {
+                    if displayUnit == .fahrenheit {
+                        let tempF = celsiusToFahrenheit(tempC)
+                        print("  \(key): \(String(format: "%.1f", tempF))°F")
+                    } else {
+                        print("  \(key): \(String(format: "%.1f", tempC))°C")
+                    }
+                } else {
+                    print("  \(key): \(value)")
+                }
             }
         }
     }
@@ -122,6 +176,12 @@ struct Set: AsyncParsableCommand {
     @Flag(name: .long, help: "Output as JSON")
     var json = false
 
+    /// Temperature unit for the input value when setting temperature characteristics.
+    /// If specified, temperature values are converted from this unit to Celsius before sending to HomeKit.
+    /// Defaults to the system locale's measurement system.
+    @Option(name: .long, help: "Temperature unit for input: celsius or fahrenheit (default: system locale)")
+    var units: TemperatureUnit?
+
     /// Parses the value string and sends set request to socket bridge
     func run() async throws {
         let client = SocketClient()
@@ -143,12 +203,30 @@ struct Set: AsyncParsableCommand {
             parsedValue = .string(value)
         }
 
+        // Convert temperature values to Celsius if needed (HomeKit uses Celsius internally)
+        let finalValue: AnyCodableValue
+        if temperatureCharacteristics.contains(characteristic) {
+            let inputUnit = units ?? defaultTemperatureUnit()
+            if inputUnit == .fahrenheit {
+                // Extract numeric value and convert F -> C
+                if let tempF = parsedValue.doubleValue ?? parsedValue.intValue.map(Double.init) {
+                    finalValue = .double((tempF - 32.0) * 5.0 / 9.0)
+                } else {
+                    finalValue = parsedValue
+                }
+            } else {
+                finalValue = parsedValue
+            }
+        } else {
+            finalValue = parsedValue
+        }
+
         let response = try await client.send(
             command: "set_device",
             params: [
                 "name": .string(device),
                 "characteristic": .string(characteristic),
-                "value": parsedValue
+                "value": finalValue
             ]
         )
 

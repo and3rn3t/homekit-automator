@@ -166,7 +166,7 @@ class HelperSocketServer {
         struct Request: Codable {
             let id: String
             let command: String
-            let params: [String: AnyCodableJSON]?
+            let params: [String: AnyCodableValue]?
         }
 
         guard let request = try? JSONDecoder().decode(Request.self, from: data) else {
@@ -333,66 +333,4 @@ class HelperSocketServer {
     }
 }
 
-// MARK: - JSON Value Helper
 
-/// A JSON-compatible enum that can decode any JSON value without prior type knowledge.
-/// Used in socket protocol to parse request parameters that may be strings, numbers, booleans, or null.
-///
-/// DIFFERENCES FROM AnyCodableValue (hypothetical):
-/// This type specializes in socket protocol parameters where:
-/// - Only primitive JSON types are needed (no nested objects/arrays)
-/// - Must decode from JSON without knowing the original type
-/// - Decoded values need to be converted to HomeKit types (strings→Bool, Int, Double)
-/// - No need for recursive object/array support
-///
-/// Example: A "value" parameter from CLI arrives as JSON number 50 or string "on",
-/// this enum preserves the raw type so convertValue() can apply domain-specific logic.
-enum AnyCodableJSON: Codable {
-    case string(String)
-    case int(Int)
-    case double(Double)
-    case bool(Bool)
-    case null
-
-    /// Extracts the string value if this is a .string case, otherwise returns nil.
-    var stringValue: String? {
-        if case .string(let s) = self { return s }
-        return nil
-    }
-
-    /// Extracts the underlying Swift value (not AnyCodableJSON).
-    /// Useful for passing to HomeKit characteristic writers that expect Any type.
-    var rawValue: Any {
-        switch self {
-        case .string(let s): return s
-        case .int(let i): return i
-        case .double(let d): return d
-        case .bool(let b): return b
-        case .null: return NSNull()
-        }
-    }
-
-    /// Decodes a single JSON value (primitive only).
-    /// Tries boolean, integer, double, then string; defaults to null.
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if container.decodeNil() { self = .null }
-        else if let b = try? container.decode(Bool.self) { self = .bool(b) }
-        else if let i = try? container.decode(Int.self) { self = .int(i) }
-        else if let d = try? container.decode(Double.self) { self = .double(d) }
-        else if let s = try? container.decode(String.self) { self = .string(s) }
-        else { self = .null }
-    }
-
-    /// Encodes the value back to JSON.
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .string(let s): try container.encode(s)
-        case .int(let i): try container.encode(i)
-        case .double(let d): try container.encode(d)
-        case .bool(let b): try container.encode(b)
-        case .null: try container.encodeNil()
-        }
-    }
-}

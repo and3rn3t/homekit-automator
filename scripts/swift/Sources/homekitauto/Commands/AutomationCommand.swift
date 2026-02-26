@@ -50,7 +50,7 @@ struct Automation: AsyncParsableCommand {
 /// Output: JSON with automation ID, shortcut name, registration status, and action count
 ///
 /// Usage:
-///   hka automation create --json '{"name":"Evening","trigger":{"type":"schedule","cron":"0 18 * * *"},"actions":[...]}'
+///   hka automation create --definition '{"name":"Evening","trigger":{"type":"schedule","cron":"0 18 * * *"},"actions":[...]}'
 ///   hka automation create --file /path/to/automation.json
 struct AutomationCreate: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -59,17 +59,21 @@ struct AutomationCreate: AsyncParsableCommand {
     )
 
     /// Inline JSON string with the complete automation definition
-    @Option(name: .long, help: "Automation JSON definition (inline)")
-    var json: String?
+    @Option(name: .long, help: "Automation definition as inline JSON")
+    var definition: String?
 
     /// File path to JSON file containing the automation definition
     @Option(name: .long, help: "Path to JSON file with automation definition")
     var file: String?
 
+    /// When true, returns result as formatted JSON instead of human-readable text
+    @Flag(name: .long, help: "Output as JSON")
+    var json = false
+
     /// Parses automation definition, generates Shortcut, and registers it
     func run() async throws {
-        guard let jsonString = json ?? readFile(file) else {
-            throw ValidationError("Provide either --json or --file with the automation definition.")
+        guard let jsonString = definition ?? readFile(file) else {
+            throw ValidationError("Provide either --definition or --file with the automation definition.")
         }
 
         // Step 1: Parse the automation definition from JSON
@@ -91,7 +95,16 @@ struct AutomationCreate: AsyncParsableCommand {
             throw SocketError.helperError("Cannot validate devices: \(discoverResponse.error ?? "discovery failed")")
         }
 
-        // TODO: Validate each action's device and characteristic against the device map
+        // Step 3b: Validate all actions against device map
+        let validator = AutomationValidator()
+        let deviceMap = extractDeviceMap(from: discoverResponse)
+
+        do {
+            try validator.validateDefinition(definition, deviceMap: deviceMap)
+        } catch {
+            print("Validation failed: \(error.localizedDescription)")
+            throw ExitCode.validationFailure
+        }
 
         // Step 4: Generate the Apple Shortcut file from actions
         let shortcutGenerator = ShortcutGenerator()
@@ -133,12 +146,18 @@ struct AutomationCreate: AsyncParsableCommand {
         try registry.save(automation)
 
         // Output result
+        // Include human-readable cron description if available
+        var triggerDescription = definition.trigger.humanReadable
+        if definition.trigger.type == "schedule", let cron = definition.trigger.cron {
+            triggerDescription = validator.humanReadableCron(cron)
+        }
+
         let result: [String: AnyCodableValue] = [
             "id": .string(automation.id),
             "name": .string(automation.name),
             "shortcutName": .string(shortcutName),
             "registered": .bool(importResult),
-            "trigger": .string(definition.trigger.humanReadable),
+            "trigger": .string(triggerDescription),
             "actionCount": .int(definition.actions.count)
         ]
 
@@ -304,6 +323,81 @@ struct AutomationEdit: AsyncParsableCommand {
         if let description = changesDict["description"] as? String {
             automation.description = description
         }
+
+        // Decode updated actions, trigger, and conditions if provided
+        let decoder = JSONDecoder()
+        var updatedActions = automation.actions
+        var updatedTrigger = automation.trigger
+        var updatedConditions = automation.conditions
+
+        if let actionsValue = changesDict["actions"] {
+            let actionsData = try JSONSerialization.data(withJSONObject: actionsValue)
+            do {
+                updatedActions = try decoder.decode([AutomationAction].self, from: actionsData)
+            } catch {
+                throw ValidationError("Invalid actions format: \(error.localizedDescription)")
+            }
+        }
+
+        if let triggerValue = changesDict["trigger"] {
+            let triggerData = try JSONSerialization.data(withJSONObject: triggerValue)
+            do {
+                updatedTrigger = try decoder.decode(AutomationTrigger.self, from: triggerData)
+            } catch {
+                throw ValidationError("Invalid trigger format: \(error.localizedDescription)")
+            }
+        }
+
+        if let conditionsValue = changesDict["conditions"] {
+            let conditionsData = try JSONSerialization.data(withJSONObject: conditionsValue)
+            do {
+                updatedConditions = try decoder.decode([AutomationCondition].self, from: conditionsData)
+            } catch {
+                throw ValidationError("Invalid conditions format: \(error.localizedDescription)")
+            }
+        }
+
+        // Validate updated actions and trigger against device map
+        if changesDict["actions"] != nil || changesDict["trigger"] != nil {
+            let client = SocketClient()
+            let discoverResponse = try await client.send(command: "discover")
+            if discoverResponse.isOk {
+                let validator = AutomationValidator()
+                let deviceMap = extractDeviceMap(from: discoverResponse)
+
+                if changesDict["actions"] != nil {
+                    do {
+                        try validator.validateActions(updatedActions, deviceMap: deviceMap)
+                    } catch {
+                        print("Validation failed: \(error.localizedDescription)")
+                        throw ExitCode.validationFailure
+                    }
+                }
+
+                if changesDict["trigger"] != nil {
+                    do {
+                        try validator.validateTrigger(updatedTrigger)
+                    } catch {
+                        print("Validation failed: \(error.localizedDescription)")
+                        throw ExitCode.validationFailure
+                    }
+                }
+            }
+        }
+
+        // Reconstruct automation with updated fields (trigger/actions/conditions are let properties)
+        automation = RegisteredAutomation(
+            id: automation.id,
+            name: automation.name,
+            description: automation.description,
+            trigger: updatedTrigger,
+            conditions: updatedConditions,
+            actions: updatedActions,
+            enabled: automation.enabled,
+            shortcutName: automation.shortcutName,
+            createdAt: automation.createdAt,
+            lastRun: automation.lastRun
+        )
 
         // If actions or trigger changed, regenerate the Apple Shortcut
         if changesDict["actions"] != nil || changesDict["trigger"] != nil {

@@ -1,23 +1,175 @@
 {
   "skill_name": "homekit-automator",
+  "version": "1.0.0",
+  "description": "Evaluation scenarios for the HomeKit Automator MCP skill. Each eval describes a natural-language prompt, the MCP tools expected to be called, the correct behavior, and a category.",
   "evals": [
     {
-      "id": 1,
+      "id": "basic_light_on",
+      "prompt": "Turn on the living room lights",
+      "expected_tools": ["home_discover", "device_control"],
+      "expected_behavior": "Should discover devices first (if not cached), then call device_control with device='Living Room Lights', characteristic='power', value=true. Confirm the light was turned on.",
+      "category": "basic"
+    },
+    {
+      "id": "basic_light_off",
       "prompt": "Turn off all the lights in the kitchen",
-      "expected_output": "The skill should call device_control to set power=false on kitchen lights. Should first call home_discover if device map isn't cached.",
-      "files": []
+      "expected_tools": ["home_discover", "device_control"],
+      "expected_behavior": "Should discover devices, identify all lights in the Kitchen room, then call device_control for each light with characteristic='power', value=false. Confirm all kitchen lights were turned off.",
+      "category": "basic"
     },
     {
-      "id": 2,
+      "id": "device_status_query",
+      "prompt": "Is the front door locked?",
+      "expected_tools": ["home_discover", "device_status"],
+      "expected_behavior": "Should discover devices, then call device_status with device='Front Door Lock'. Report the current lockState value in plain language (locked or unlocked).",
+      "category": "basic"
+    },
+    {
+      "id": "scene_trigger",
+      "prompt": "Activate the Good Night scene",
+      "expected_tools": ["scene_trigger"],
+      "expected_behavior": "Should call scene_trigger with scene='Good Night'. Confirm the scene was activated and briefly describe what it does if known.",
+      "category": "basic"
+    },
+    {
+      "id": "simple_automation_morning",
       "prompt": "Set up a morning routine that turns on my kitchen lights to 60% brightness and sets the thermostat to 72 degrees every weekday at 6:45am",
-      "expected_output": "The skill should parse this into an automation_create call with: schedule trigger (cron: '45 6 * * 1-5'), two actions (kitchen lights brightness 60, thermostat targetTemp 72). Should confirm with user before creating. Should mention the Apple Shortcut registration.",
-      "files": []
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should parse a schedule trigger (cron: '45 6 * * 1-5'), two actions (Kitchen Lights brightness 60, Bedroom Thermostat targetTemperature 72). Should present a summary and confirm before calling automation_create with --definition containing the full automation object. Mention Apple Shortcut registration.",
+      "category": "automation"
     },
     {
-      "id": 3,
-      "prompt": "What automations do I have set up? Can you also suggest some new ones based on my devices?",
-      "expected_output": "Should call automation_list followed by home_suggest. Should present existing automations clearly, then offer relevant suggestions based on discovered devices.",
-      "files": []
+      "id": "complex_automation_delays",
+      "prompt": "Create a wake-up routine for 6:30am every day: turn on bedroom light to 20%, wait 5 minutes, increase to 60%, turn on coffee maker, wait 10 minutes, set thermostat to 72, then unlock the front door",
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should create an automation with 5+ actions including delaySeconds between steps: bedroom light 20%, delay 300s, bedroom light 60%, coffee maker power on, delay 600s, thermostat 72, front door unlock. Trigger is schedule cron '30 6 * * *'. Should confirm the full sequence with the user before creating.",
+      "category": "automation"
+    },
+    {
+      "id": "automation_with_time_condition",
+      "prompt": "Turn on the porch lights at sunset, but only on weekdays",
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should create an automation with a solar trigger (event: 'sunset') and a day_of_week condition restricting to Monday-Friday. Action: porch lights power on. If porch lights aren't found, suggest closest match or ask for clarification.",
+      "category": "automation"
+    },
+    {
+      "id": "automation_with_device_condition",
+      "prompt": "If the temperature drops below 65, turn on the heater and send me a notification",
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should create an automation with a device_state trigger on the thermostat's currentTemperature < 65. Action: heater/thermostat hvacMode set to heat. Should note that push notifications require additional Shortcut configuration. Explain any limitations.",
+      "category": "automation"
+    },
+    {
+      "id": "automation_edit_time",
+      "prompt": "Change my morning routine to start at 7:15 instead",
+      "expected_tools": ["automation_list", "automation_edit"],
+      "expected_behavior": "Should first list automations to find 'Morning Routine', then call automation_edit with changes containing an updated trigger cron ('15 7 * * 1-5'). Confirm the change was applied.",
+      "category": "automation"
+    },
+    {
+      "id": "automation_delete",
+      "prompt": "Delete my away mode automation",
+      "expected_tools": ["automation_list", "automation_delete"],
+      "expected_behavior": "Should list automations to find 'Away Mode', confirm deletion with the user, then call automation_delete with the automation's id or name. Mention that the Apple Shortcut will also be removed.",
+      "category": "automation"
+    },
+    {
+      "id": "automation_list_filter",
+      "prompt": "Show me all my enabled automations",
+      "expected_tools": ["automation_list"],
+      "expected_behavior": "Should call automation_list with filter='enabled'. Present results in a clean, readable format showing name, trigger description, and what each automation does.",
+      "category": "automation"
+    },
+    {
+      "id": "ambiguous_device_name",
+      "prompt": "Turn off the light",
+      "expected_tools": ["home_discover"],
+      "expected_behavior": "Should discover devices and find multiple lights across rooms. Should ask the user to clarify which light (Kitchen Lights, Living Room Lights, Bedroom Light) or offer to turn off all lights. Must NOT silently pick one.",
+      "category": "error"
+    },
+    {
+      "id": "unsupported_characteristic",
+      "prompt": "Dim the front door lock to 50%",
+      "expected_tools": ["home_discover"],
+      "expected_behavior": "Should discover devices, find the Front Door Lock, and determine it only supports lockState (not brightness). Should explain that locks can't be dimmed and list what the lock can do (lock/unlock).",
+      "category": "error"
+    },
+    {
+      "id": "multi_room_query",
+      "prompt": "What's the status of all devices in the kitchen and bedroom?",
+      "expected_tools": ["home_discover", "device_status", "device_status"],
+      "expected_behavior": "Should discover devices, then call device_status with room='Kitchen' and device_status with room='Bedroom' (or individual device queries). Present a combined summary organized by room.",
+      "category": "basic"
+    },
+    {
+      "id": "temperature_control_units",
+      "prompt": "Set the bedroom thermostat to 22 degrees Celsius",
+      "expected_tools": ["home_discover", "device_control"],
+      "expected_behavior": "Should discover devices, find Bedroom Thermostat, and call device_control with characteristic='targetTemperature' and the appropriate value. If the system uses Fahrenheit, convert 22C to ~72F. Confirm the temperature unit used.",
+      "category": "basic"
+    },
+    {
+      "id": "energy_insights",
+      "prompt": "How much energy have my devices used this month?",
+      "expected_tools": ["energy_summary"],
+      "expected_behavior": "Should call energy_summary with period='month'. Present the results clearly, including active devices count, automation run count, and any estimated savings or optimization suggestions.",
+      "category": "intelligence"
+    },
+    {
+      "id": "home_suggestions",
+      "prompt": "What automations would you suggest for my home?",
+      "expected_tools": ["home_discover", "home_suggest"],
+      "expected_behavior": "Should discover devices first to understand the home setup, then call home_suggest without a specific focus. Present suggestions in a readable format, explaining the benefit of each and offering to create any the user likes.",
+      "category": "intelligence"
+    },
+    {
+      "id": "template_bedtime",
+      "prompt": "Set up a bedtime routine",
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should discover devices, then propose a bedtime template based on available devices: lights off or dimmed to nightlight, doors locked, thermostat lowered to sleep temperature. Use a manual trigger with keyword 'bedtime'. Confirm the plan before creating.",
+      "category": "template"
+    },
+    {
+      "id": "template_away_mode",
+      "prompt": "Create an away mode for when I leave the house",
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should discover devices and propose an away-mode template: all lights off, doors locked, thermostat set to eco/away temperature. Use a manual trigger with keyword 'away'. Include security-relevant devices. Confirm before creating.",
+      "category": "template"
+    },
+    {
+      "id": "template_movie_night",
+      "prompt": "Set up a movie night mode",
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should discover devices and propose a movie-night template: living room lights dimmed to 10%, other room lights off, TV powered on if available. Use a manual trigger with keyword 'movie night'. Confirm before creating.",
+      "category": "template"
+    },
+    {
+      "id": "template_guest_mode",
+      "prompt": "I have guests coming over, set up a guest mode",
+      "expected_tools": ["home_discover", "automation_create"],
+      "expected_behavior": "Should discover devices and propose a guest-mode template: guest room lights on, front door unlocked temporarily, common area lights at comfortable brightness. Use a manual trigger with keyword 'guest mode'. Confirm before creating.",
+      "category": "template"
+    },
+    {
+      "id": "template_weekend_morning",
+      "prompt": "Create a good morning routine for weekends that's more relaxed than my weekday one",
+      "expected_tools": ["home_discover", "automation_list", "automation_create"],
+      "expected_behavior": "Should discover devices and list existing automations to see the weekday routine. Propose a weekend variant: later time (e.g., 8:30 AM), gentler lighting (lower brightness), comfortable temperature. Schedule trigger with cron for Sat+Sun only ('30 8 * * 0,6'). Confirm before creating.",
+      "category": "template"
+    },
+    {
+      "id": "error_device_not_found",
+      "prompt": "Turn on the garage door opener",
+      "expected_tools": ["home_discover"],
+      "expected_behavior": "Should discover devices and find no device named 'garage door opener'. Should report that the device wasn't found, suggest similar device names if any match partially, and ask the user to check the device name in the Home app.",
+      "category": "error"
+    },
+    {
+      "id": "multi_home_scenario",
+      "prompt": "Show me the devices in my beach house",
+      "expected_tools": ["home_discover"],
+      "expected_behavior": "Should call home_discover and check if multiple homes exist. If a 'beach house' home is found, show its devices. If only one home exists, explain that only one home was found and ask if that's the right one. Handle multi-home gracefully.",
+      "category": "error"
     }
   ]
 }
