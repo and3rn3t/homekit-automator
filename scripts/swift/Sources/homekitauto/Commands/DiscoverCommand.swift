@@ -39,10 +39,18 @@ struct Discover: AsyncParsableCommand {
     @Flag(name: .long, help: "Compact LLM-optimized output")
     var compact = false
 
+    /// Optional home name filter — if specified, only this home's data is returned
+    @Option(name: .long, help: "Filter by home name")
+    var home: String?
+
     /// Queries the socket bridge to enumerate all HomeKit data and displays it in requested format
     func run() async throws {
         let client = SocketClient()
-        let response = try await client.send(command: "discover")
+        var params: [String: AnyCodableValue] = [:]
+        if let home = home {
+            params["home"] = .string(home)
+        }
+        let response = try await client.send(command: "discover", params: params.isEmpty ? nil : params)
 
         guard response.isOk else {
             throw SocketError.helperError(response.error ?? "Discovery failed")

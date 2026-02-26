@@ -11,6 +11,7 @@
 /// The registry does not employ internal locking.
 
 import Foundation
+import Logging
 
 /// Manages the persistent automation registry and logs for HomeKit automations.
 ///
@@ -86,10 +87,12 @@ struct AutomationRegistry {
     func save(_ automation: RegisteredAutomation) throws {
         var all = try loadAll()
         if all.contains(where: { $0.name.lowercased() == automation.name.lowercased() }) {
+            Log.automation.warning("Duplicate name rejected", metadata: ["name": "\(automation.name)"])
             throw RegistryError.duplicateName(automation.name)
         }
         all.append(automation)
         try persist(all)
+        Log.automation.info("Automation saved", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
     }
 
     /// Updates an existing automation in the registry.
@@ -101,13 +104,16 @@ struct AutomationRegistry {
     func update(_ automation: RegisteredAutomation) throws {
         var all = try loadAll()
         guard let index = all.firstIndex(where: { $0.id == automation.id }) else {
+            Log.automation.warning("Update target not found", metadata: ["id": "\(automation.id)"])
             throw RegistryError.notFound(automation.id)
         }
         if all.contains(where: { $0.id != automation.id && $0.name.lowercased() == automation.name.lowercased() }) {
+            Log.automation.warning("Duplicate name rejected on update", metadata: ["name": "\(automation.name)"])
             throw RegistryError.duplicateName(automation.name)
         }
         all[index] = automation
         try persist(all)
+        Log.automation.info("Automation updated", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
     }
 
     /// Deletes an automation from the registry by ID.
@@ -119,10 +125,12 @@ struct AutomationRegistry {
     func delete(_ id: String) throws {
         var all = try loadAll()
         guard all.contains(where: { $0.id == id }) else {
+            Log.automation.warning("Delete target not found", metadata: ["id": "\(id)"])
             throw RegistryError.notFound(id)
         }
         all.removeAll { $0.id == id }
         try persist(all)
+        Log.automation.info("Automation deleted", metadata: ["id": "\(id)"])
     }
 
     // MARK: - Persistence
@@ -153,6 +161,7 @@ struct AutomationRegistry {
 
         var entries = try loadLog()
         entries.append(entry)
+        Log.automation.debug("Log entry appended", metadata: ["totalEntries": "\(entries.count)"])
 
         // Keep only the last 1000 entries
         if entries.count > 1000 {

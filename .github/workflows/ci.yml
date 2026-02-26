@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+
+      - name: Build CLI (Debug)
+        run: swift build
+        working-directory: scripts/swift
+
+      - name: Build CLI (Release)
+        run: swift build -c release
+        working-directory: scripts/swift
+
+      - name: Run Swift Tests
+        run: swift test
+        working-directory: scripts/swift
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run MCP Server Tests
+        run: npm test
+        working-directory: scripts/mcp-server
+
+      - name: Lint Check
+        run: |
+          if command -v swiftlint &> /dev/null; then
+            swiftlint lint --config .swiftlint.yml --reporter github-actions-logging || true
+          else
+            echo "SwiftLint not installed, skipping lint"
+          fi

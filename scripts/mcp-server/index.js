@@ -57,7 +57,12 @@ const TOOLS = [
       "Call this first in any new conversation about the user's home.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        home: {
+          type: "string",
+          description: "Filter discovery to a specific home name",
+        },
+      },
     },
   },
   {
@@ -73,6 +78,10 @@ const TOOLS = [
         room: {
           type: "string",
           description: "Room name (returns all devices in room)",
+        },
+        home: {
+          type: "string",
+          description: "Home name to scope the lookup",
         },
       },
     },
@@ -98,6 +107,10 @@ const TOOLS = [
             "Target value: true/false for power/locks, 0-100 for brightness/position, " +
             "number for temperature, string for modes",
         },
+        home: {
+          type: "string",
+          description: "Home name to scope the device lookup",
+        },
       },
       required: ["device", "characteristic", "value"],
     },
@@ -111,6 +124,10 @@ const TOOLS = [
         scene: {
           type: "string",
           description: "Scene name or UUID",
+        },
+        home: {
+          type: "string",
+          description: "Home name to scope the scene lookup",
         },
       },
       required: ["scene"],
@@ -313,23 +330,40 @@ async function handleTool(name, args) {
   switch (name) {
     // ── Device Control Tools ──
 
-    case "home_discover":
-      // Maps to: homekitauto discover --json
-      return await runCli(["discover"]);
+    case "home_discover": {
+      // Maps to: homekitauto discover [--home <name>] --json
+      const discoverArgs = ["discover"];
+      if (args.home) discoverArgs.push("--home", args.home);
+      return await runCli(discoverArgs);
+    }
 
-    case "device_status":
-      // Maps to: homekitauto get <device> --json  OR  homekitauto rooms --json
-      if (args.device) return await runCli(["get", args.device]);
-      if (args.room) return await runCli(["rooms"]);
-      throw new Error("Provide either device or room parameter");
+    case "device_status": {
+      // Maps to: homekitauto get <device> [--home <name>] --json  OR  homekitauto rooms [--home <name>] --json
+      const statusArgs = [];
+      if (args.device) {
+        statusArgs.push("get", args.device);
+      } else if (args.room) {
+        statusArgs.push("rooms");
+      } else {
+        throw new Error("Provide either device or room parameter");
+      }
+      if (args.home) statusArgs.push("--home", args.home);
+      return await runCli(statusArgs);
+    }
 
-    case "device_control":
-      // Maps to: homekitauto set <device> <characteristic> <value> --json
-      return await runCli(["set", args.device, args.characteristic, String(args.value)]);
+    case "device_control": {
+      // Maps to: homekitauto set <device> <characteristic> <value> [--home <name>] --json
+      const controlArgs = ["set", args.device, args.characteristic, String(args.value)];
+      if (args.home) controlArgs.push("--home", args.home);
+      return await runCli(controlArgs);
+    }
 
-    case "scene_trigger":
-      // Maps to: homekitauto trigger <scene> --json
-      return await runCli(["trigger", args.scene]);
+    case "scene_trigger": {
+      // Maps to: homekitauto trigger <scene> [--home <name>] --json
+      const triggerArgs = ["trigger", args.scene];
+      if (args.home) triggerArgs.push("--home", args.home);
+      return await runCli(triggerArgs);
+    }
 
     // ── Automation CRUD Tools ──
 

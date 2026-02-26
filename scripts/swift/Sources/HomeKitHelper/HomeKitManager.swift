@@ -12,7 +12,7 @@ import Foundation
 /// HomeKit framework is not thread-safe; accessing homes, accessories, or characteristics from background threads
 /// can cause crashes or data corruption.
 @MainActor
-class HomeKitManager: NSObject, HMHomeManagerDelegate {
+class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
 
     /// The underlying HomeKit home manager.
     private var homeManager: HMHomeManager!
@@ -20,6 +20,16 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate {
     private var isReady = false
     /// Continuations waiting for homeManagerDidUpdateHomes callback; allows multiple waiters.
     private var readyContinuations: [CheckedContinuation<Void, Never>] = []
+
+    // MARK: - State Change Monitoring
+
+    /// Circular buffer storing recent device state changes for the `state_changes` command.
+    /// Capped at 200 entries to prevent unbounded memory growth.
+    private(set) var recentStateChanges: [[String: Any]] = []
+    /// Maximum number of state changes retained in the circular buffer.
+    private let maxStateChanges = 200
+    /// Set of device names the user has explicitly subscribed to for monitoring.
+    private(set) var subscribedDevices: Swift.Set<String> = []
 
     override init() {
         super.init()
@@ -31,9 +41,14 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate {
 
     /// Called by HMHomeManager when homes are first loaded or updated.
     /// Resumes all waiters in readyContinuations so that async commands can proceed.
+    /// Also registers as HMHomeDelegate on each home for state change monitoring.
     nonisolated func homeManagerDidUpdateHomes(_ manager: HMHomeManager) {
         Task { @MainActor in
             isReady = true
+            // Register as delegate on each home for state change monitoring
+            for home in manager.homes {
+                home.delegate = self
+            }
             for continuation in readyContinuations {
                 continuation.resume()
             }
@@ -50,6 +65,64 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate {
         await withCheckedContinuation { continuation in
             readyContinuations.append(continuation)
         }
+    }
+
+    // MARK: - HMHomeDelegate (State Change Monitoring)
+
+    /// Called when a characteristic value changes on any accessory in a home.
+    /// Records the change in the circular buffer for retrieval via the `state_changes` command.
+    nonisolated func home(_ home: HMHome, didUpdateValueFor characteristic: HMCharacteristic) {
+        Task { @MainActor in
+            guard let accessory = characteristic.service?.accessory else { return }
+            let deviceName = accessory.name
+            let charName = characteristicTypeName(characteristic.characteristicType)
+            let value = characteristic.value
+
+            let changeEntry: [String: Any] = [
+                "device": deviceName,
+                "home": home.name,
+                "room": accessory.room?.name ?? "Unknown",
+                "characteristic": charName,
+                "value": value ?? "null",
+                "timestamp": ISO8601DateFormatter().string(from: Date()),
+                "subscribed": subscribedDevices.contains(deviceName)
+            ]
+
+            recentStateChanges.append(changeEntry)
+            // Maintain circular buffer size
+            if recentStateChanges.count > maxStateChanges {
+                recentStateChanges.removeFirst(recentStateChanges.count - maxStateChanges)
+            }
+
+            if subscribedDevices.contains(deviceName) {
+                print("[HomeKitManager] Subscribed device changed: \(deviceName).\(charName) = \(value ?? "nil")")
+            }
+        }
+    }
+
+    // MARK: - State Changes & Subscriptions
+
+    /// Returns recent state changes from the circular buffer.
+    /// - Parameter deviceName: Optional filter — if provided, only changes for this device are returned.
+    /// - Returns: Array of state change dictionaries.
+    func getStateChanges(deviceName: String? = nil) -> [[String: Any]] {
+        if let deviceName = deviceName {
+            return recentStateChanges.filter { ($0["device"] as? String) == deviceName }
+        }
+        return recentStateChanges
+    }
+
+    /// Subscribes to state change notifications for a specific device.
+    /// Subscribed devices are flagged in state change entries and logged to console.
+    /// - Parameter deviceName: The name of the device to subscribe to.
+    /// - Returns: Confirmation dictionary with subscription status.
+    func subscribe(deviceName: String) -> [String: Any] {
+        subscribedDevices.insert(deviceName)
+        return [
+            "subscribed": true,
+            "device": deviceName,
+            "totalSubscriptions": subscribedDevices.count
+        ]
     }
 
     // MARK: - Status

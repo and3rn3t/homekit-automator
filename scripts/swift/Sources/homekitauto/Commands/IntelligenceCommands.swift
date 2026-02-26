@@ -64,7 +64,14 @@ struct Suggest: AsyncParsableCommand {
             existingAutomations: existingAutomations,
             focus: focus
         )
-        let suggestions = analyzer.generateSuggestions()
+        var suggestions = analyzer.generateSuggestions()
+
+        // Step 4: Add seasonal suggestions
+        suggestions += analyzer.generateSeasonalSuggestions()
+
+        // Step 5: Add pattern-based suggestions from execution log
+        let log = try registry.loadLog()
+        suggestions += analyzer.generatePatternSuggestions(from: log)
 
         // Output suggestions in requested format
         if json {
@@ -127,6 +134,10 @@ struct Energy: AsyncParsableCommand {
     @Option(name: .long, help: "Period: today, week, month (default: week)")
     var period: String = "week"
 
+    /// When true, includes historical energy analysis with execution patterns, peak hours, and device-level estimates
+    @Flag(name: .long, help: "Include historical energy analysis")
+    var history = false
+
     /// When true, returns insights as formatted JSON instead of formatted summary
     @Flag(name: .long, help: "Output as JSON")
     var json = false
@@ -154,11 +165,21 @@ struct Energy: AsyncParsableCommand {
         )
         let insights = analyzer.generateEnergyInsights(log: log, period: period)
 
+        // If --history is set, generate extended historical analysis
+        var historyData: [String: AnyCodableValue]? = nil
+        if history {
+            historyData = generateEnergyHistory(log: log, automations: automations, deviceMap: discoverResponse.data)
+        }
+
         // Output insights in requested format
         if json {
+            var output = insights
+            if let hd = historyData {
+                output["history"] = .dictionary(hd)
+            }
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let jsonData = try encoder.encode(insights)
+            let jsonData = try encoder.encode(output)
             print(String(data: jsonData, encoding: .utf8) ?? "{}")
             return
         }
@@ -192,6 +213,149 @@ struct Energy: AsyncParsableCommand {
                 print("  * \(insight)")
             }
         }
+
+        // Show historical analysis if --history flag is set
+        if let hd = historyData {
+            print("\nHistorical Analysis")
+            print("-------------------")
+
+            if let energyAutomations = hd["energyRelatedAutomations"]?.arrayValue {
+                print("  Energy-related automations: \(energyAutomations.count)")
+                for auto in energyAutomations {
+                    if let name = auto.stringValue {
+                        print("    - \(name)")
+                    }
+                }
+            }
+
+            if let weekChange = hd["weekOverWeekChange"]?.stringValue {
+                print("  Week-over-week execution change: \(weekChange)")
+            }
+
+            if let peakHours = hd["peakUsageHours"]?.arrayValue {
+                let hourStrings = peakHours.compactMap { $0.stringValue }
+                print("  Peak usage hours: \(hourStrings.joined(separator: ", "))")
+            }
+
+            if let estimates = hd["deviceEnergyEstimates"]?.arrayValue {
+                print("  Device energy estimates:")
+                for est in estimates {
+                    if let dict = est.dictionaryValue,
+                       let name = dict["device"]?.stringValue,
+                       let wh = dict["estimatedWh"]?.stringValue {
+                        print("    - \(name): ~\(wh)")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Generates historical energy analysis from the automation execution log.
+    ///
+    /// Computes:
+    /// - Which automations affect energy-related devices (thermostats, lights, outlets)
+    /// - Week-over-week change in execution frequency
+    /// - Device-level energy estimates based on device type and automation frequency
+    /// - Peak usage hours from the execution log
+    ///
+    /// - Parameters:
+    ///   - log: Automation execution log entries.
+    ///   - automations: All registered automations for cross-referencing device types.
+    ///   - deviceMap: Current device map for device category lookup.
+    /// - Returns: Dictionary with historical energy analysis data.
+    private func generateEnergyHistory(
+        log: [AutomationLogEntry],
+        automations: [RegisteredAutomation],
+        deviceMap: AnyCodableValue?
+    ) -> [String: AnyCodableValue] {
+        var result: [String: AnyCodableValue] = [:]
+
+        // Find which automations affect energy-related devices
+        var energyRelatedNames: [String] = []
+        for auto in automations {
+            let affectsEnergy = auto.actions.contains { action in
+                // Check if the action targets energy characteristics
+                let energyChars: Swift.Set<String> = ["power", "brightness", "targetTemperature", "hvacMode", "active"]
+                return energyChars.contains(action.characteristic) || action.type == "scene"
+            }
+            if affectsEnergy {
+                energyRelatedNames.append(auto.name)
+            }
+        }
+        result["energyRelatedAutomations"] = .array(energyRelatedNames.map { .string($0) })
+
+        // Week-over-week change in execution frequency
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+        let oneWeekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
+        let twoWeeksAgo = Calendar.current.date(byAdding: .day, value: -14, to: now) ?? now
+
+        let thisWeekRuns = log.filter { entry in
+            guard let date = formatter.date(from: entry.timestamp) else { return false }
+            return date >= oneWeekAgo
+        }.count
+
+        let lastWeekRuns = log.filter { entry in
+            guard let date = formatter.date(from: entry.timestamp) else { return false }
+            return date >= twoWeeksAgo && date < oneWeekAgo
+        }.count
+
+        if lastWeekRuns > 0 {
+            let changePercent = Int(Double(thisWeekRuns - lastWeekRuns) / Double(lastWeekRuns) * 100)
+            let changeStr = changePercent >= 0 ? "+\(changePercent)%" : "\(changePercent)%"
+            result["weekOverWeekChange"] = .string("\(changeStr) (\(lastWeekRuns) -> \(thisWeekRuns) runs)")
+        } else {
+            result["weekOverWeekChange"] = .string("No data from previous week")
+        }
+
+        // Peak usage hours
+        var hourCounts: [Int: Int] = [:]
+        for entry in log {
+            if let date = formatter.date(from: entry.timestamp) {
+                let hour = Calendar.current.component(.hour, from: date)
+                hourCounts[hour, default: 0] += 1
+            }
+        }
+
+        let sortedHours = hourCounts.sorted { $0.value > $1.value }
+        let topHours = sortedHours.prefix(3).map { (hour, count) -> String in
+            let amPm = hour >= 12 ? "\(hour == 12 ? 12 : hour - 12) PM" : "\(hour == 0 ? 12 : hour) AM"
+            return "\(amPm) (\(count) runs)"
+        }
+        result["peakUsageHours"] = .array(topHours.map { .string($0) })
+
+        // Device-level energy estimates (rough estimates based on device type)
+        // Watts estimates: light ~10W, thermostat ~varies, outlet ~100W, fan ~50W
+        let deviceTypeWatts: [String: Double] = [
+            "light": 10.0, "lightbulb": 10.0,
+            "thermostat": 0.0, // Can't estimate HVAC from automation data alone
+            "outlet": 100.0,
+            "fan": 50.0,
+            "switch": 60.0
+        ]
+
+        var deviceEstimates: [[String: AnyCodableValue]] = []
+        // Estimate energy from automations that control power on devices
+        for auto in automations where energyRelatedNames.contains(auto.name) {
+            let runsForAuto = log.filter { $0.automationName == auto.name }.count
+            for action in auto.actions {
+                if action.characteristic == "power" && action.value.boolValue == true {
+                    // Estimate: device runs for ~1 hour per automation trigger
+                    let category = action.room ?? "unknown"
+                    let watts = deviceTypeWatts.first { _ in true }?.value ?? 10.0
+                    let estimatedWh = watts * Double(runsForAuto) // 1 hour per run
+                    deviceEstimates.append([
+                        "device": .string(action.deviceName),
+                        "category": .string(category),
+                        "estimatedWh": .string(String(format: "%.0f Wh", estimatedWh)),
+                        "runsInPeriod": .int(runsForAuto)
+                    ])
+                }
+            }
+        }
+        result["deviceEnergyEstimates"] = .array(deviceEstimates.map { .dictionary($0) })
+
+        return result
     }
 }
 

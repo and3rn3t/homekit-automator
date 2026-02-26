@@ -18,6 +18,7 @@
 
 import ArgumentParser
 import Foundation
+import Logging
 
 /// Root command for the HomeKit Automator CLI.
 ///
@@ -32,6 +33,9 @@ import Foundation
 ///   homekitauto suggest                # Get automation suggestions
 @main
 struct HomeKitAuto: AsyncParsableCommand {
+    @Flag(name: .shortAndLong, help: "Enable verbose (debug-level) logging.")
+    var verbose: Bool = false
+
     static let configuration = CommandConfiguration(
         commandName: "homekitauto",
         abstract: "Control Apple HomeKit devices and manage automations from the command line.",
@@ -51,4 +55,12 @@ struct HomeKitAuto: AsyncParsableCommand {
         ],
         defaultSubcommand: Status.self
     )
+
+    mutating func run() async throws {
+        Log.configure(verbose: verbose)
+        Log.main.info("HomeKit Automator CLI starting", metadata: ["version": "1.0.0"])
+        // Default subcommand (Status) is handled by ArgumentParser
+        let status = Status()
+        try await status.run()
+    }
 }

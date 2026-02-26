@@ -28,6 +28,7 @@
 /// 3. Manage: Run, delete, or check existence via the macOS `shortcuts` command-line tool
 
 import Foundation
+import Logging
 
 /// Generates Apple Shortcuts from automation action lists and manages their lifecycle.
 ///
@@ -64,6 +65,7 @@ struct ShortcutGenerator {
     ///   - actions: Array of AutomationAction objects to serialize
     ///   - outputPath: File URL where the .shortcut plist should be written
     func generate(name: String, actions: [AutomationAction], outputPath: URL) throws {
+        Log.shortcut.info("Generating shortcut", metadata: ["name": "\(name)", "actions": "\(actions.count)", "path": "\(outputPath.path)"])
         var workflowActions: [[String: Any]] = []
 
         // Add a comment action identifying the source
@@ -121,6 +123,7 @@ struct ShortcutGenerator {
         )
 
         try plistData.write(to: outputPath, options: .atomic)
+        Log.shortcut.info("Shortcut file written", metadata: ["path": "\(outputPath.path)", "bytes": "\(plistData.count)"])
     }
 
     /// Import a Shortcut file into the Shortcuts app.
@@ -140,6 +143,7 @@ struct ShortcutGenerator {
     ///   - path: File URL pointing to the .shortcut plist file
     /// - Returns: True if import succeeded, false otherwise
     func importShortcut(name: String, path: URL) async throws -> Bool {
+        Log.shortcut.info("Importing shortcut", metadata: ["name": "\(name)", "path": "\(path.path)"])
         // Check if a shortcut with this name already exists
         if await ShortcutGenerator.shortcutExists(name: name) {
             print("⚠️  Warning: Shortcut '\(name)' already exists. It will be overwritten.")
@@ -163,12 +167,15 @@ struct ShortcutGenerator {
             process.waitUntilExit()
 
             if process.terminationStatus == 0 {
+                Log.shortcut.info("Shortcut imported via CLI", metadata: ["name": "\(name)"])
                 return true
             }
 
+            Log.shortcut.debug("CLI import failed, falling back to open", metadata: ["exitCode": "\(process.terminationStatus)"])
             // Fallback: try opening the file (prompts user)
             return try await importViaOpen(path: path)
         } catch {
+            Log.shortcut.debug("CLI import threw error, falling back to open", metadata: ["error": "\(error)"])
             // Fallback: try opening the file
             return try await importViaOpen(path: path)
         }

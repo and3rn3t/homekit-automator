@@ -71,6 +71,10 @@ struct Get: AsyncParsableCommand {
     @Argument(help: "Device name or UUID")
     var device: String
 
+    /// Optional home name to scope the device lookup to a specific home
+    @Option(name: .long, help: "Home name to scope device lookup")
+    var home: String?
+
     /// When true, returns device state as formatted JSON instead of human-readable text
     @Flag(name: .long, help: "Output as JSON")
     var json = false
@@ -83,9 +87,13 @@ struct Get: AsyncParsableCommand {
     /// Queries the socket bridge for device state and displays it
     func run() async throws {
         let client = SocketClient()
+        var params: [String: AnyCodableValue] = ["name": .string(device)]
+        if let home = home {
+            params["home"] = .string(home)
+        }
         let response = try await client.send(
             command: "get_device",
-            params: ["name": .string(device)]
+            params: params
         )
 
         guard response.isOk else {
@@ -172,6 +180,10 @@ struct Set: AsyncParsableCommand {
     @Argument(help: "Value to set (true/false, number, or string)")
     var value: String
 
+    /// Optional home name to scope the device lookup to a specific home
+    @Option(name: .long, help: "Home name to scope device lookup")
+    var home: String?
+
     /// When true, returns transaction details as formatted JSON instead of short summary
     @Flag(name: .long, help: "Output as JSON")
     var json = false
@@ -221,13 +233,17 @@ struct Set: AsyncParsableCommand {
             finalValue = parsedValue
         }
 
+        var setParams: [String: AnyCodableValue] = [
+            "name": .string(device),
+            "characteristic": .string(characteristic),
+            "value": finalValue
+        ]
+        if let home = home {
+            setParams["home"] = .string(home)
+        }
         let response = try await client.send(
             command: "set_device",
-            params: [
-                "name": .string(device),
-                "characteristic": .string(characteristic),
-                "value": finalValue
-            ]
+            params: setParams
         )
 
         guard response.isOk else {

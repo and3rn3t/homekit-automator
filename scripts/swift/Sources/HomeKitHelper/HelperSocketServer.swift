@@ -232,6 +232,24 @@ class HelperSocketServer {
                     let name = request.params?["name"]?.stringValue ?? ""
                     responseData = try await self.homeKitManager.triggerScene(nameOrUuid: name)
 
+                /// "state_changes": Returns recent device state changes from the circular buffer
+                case "state_changes":
+                    let deviceFilter = request.params?["device"]?.stringValue
+                    let changes = self.homeKitManager.getStateChanges(deviceName: deviceFilter)
+                    responseData = [
+                        "changes": changes,
+                        "count": changes.count
+                    ]
+
+                /// "subscribe": Subscribes to state change notifications for a specific device
+                case "subscribe":
+                    let deviceName = request.params?["device"]?.stringValue ?? ""
+                    if deviceName.isEmpty {
+                        responseError = "Missing 'device' parameter for subscribe command"
+                    } else {
+                        responseData = self.homeKitManager.subscribe(deviceName: deviceName)
+                    }
+
                 /// "get_config": Returns persisted config (filterMode, defaultHome, etc.)
                 case "get_config":
                     responseData = self.loadConfig()

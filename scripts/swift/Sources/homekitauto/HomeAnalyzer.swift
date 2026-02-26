@@ -224,6 +224,224 @@ struct HomeAnalyzer {
         return suggestions
     }
 
+    // MARK: - Seasonal Suggestions
+
+    /// Generates automation suggestions tailored to the current season.
+    ///
+    /// ## Seasonal Rules
+    /// - **Winter (Dec-Feb)**: Heating schedules, holiday lighting, draft detection
+    /// - **Spring (Mar-May)**: Ventilation reminders, allergy-aware window control
+    /// - **Summer (Jun-Aug)**: Cooling schedules, shade control, energy saving tips
+    /// - **Fall (Sep-Nov)**: Transition schedules, early darkness lighting
+    ///
+    /// - Returns: An array of seasonal `AutomationSuggestion` objects.
+    func generateSeasonalSuggestions() -> [AutomationSuggestion] {
+        var suggestions: [AutomationSuggestion] = []
+
+        let month = Calendar.current.component(.month, from: Date())
+
+        guard let homes = deviceMap?.dictionaryValue?["homes"]?.arrayValue else {
+            return suggestions
+        }
+
+        // Collect devices for seasonal suggestions
+        var hasThermostats = false
+        var hasLights = false
+        var hasWindowCoverings = false
+
+        for home in homes {
+            guard let rooms = home.dictionaryValue?["rooms"]?.arrayValue else { continue }
+            for room in rooms {
+                guard let accessories = room.dictionaryValue?["accessories"]?.arrayValue else { continue }
+                for accessory in accessories {
+                    guard let category = accessory.dictionaryValue?["category"]?.stringValue else { continue }
+                    switch category {
+                    case "thermostat": hasThermostats = true
+                    case "light", "lightbulb": hasLights = true
+                    case "windowCovering": hasWindowCoverings = true
+                    default: break
+                    }
+                }
+            }
+        }
+
+        let existingNames = Swift.Set(existingAutomations.map { $0.name.lowercased() })
+
+        switch month {
+        case 12, 1, 2: // Winter
+            if hasThermostats && !existingNames.contains("winter heating schedule") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Winter Heating Schedule",
+                    reason: "Cold months detected — a heating schedule can keep your home warm efficiently",
+                    trigger: "weekdays at 6:00 AM",
+                    actions: ["Thermostat -> heat to 72°F", "Thermostat -> eco mode at 10 PM"],
+                    category: "comfort"
+                ))
+            }
+            if hasLights && !existingNames.contains("holiday lighting") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Holiday Lighting",
+                    reason: "Winter season — schedule festive lighting for evenings",
+                    trigger: "daily at sunset",
+                    actions: ["Outdoor lights -> on", "Accent lights -> holiday color"],
+                    category: "convenience"
+                ))
+            }
+
+        case 3, 4, 5: // Spring
+            if hasThermostats && !existingNames.contains("spring ventilation reminder") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Spring Ventilation Reminder",
+                    reason: "Spring air quality can benefit from regular ventilation",
+                    trigger: "daily at 10:00 AM",
+                    actions: ["Thermostat -> fan mode", "Notification -> open windows for fresh air"],
+                    category: "comfort"
+                ))
+            }
+            if hasWindowCoverings && !existingNames.contains("allergy-aware windows") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Allergy-Aware Windows",
+                    reason: "Spring pollen season — close coverings during peak pollen hours",
+                    trigger: "daily at 10:00 AM",
+                    actions: ["Window coverings -> closed (10 AM - 4 PM)"],
+                    category: "comfort"
+                ))
+            }
+
+        case 6, 7, 8: // Summer
+            if hasThermostats && !existingNames.contains("summer cooling schedule") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Summer Cooling Schedule",
+                    reason: "Hot months — optimize cooling to save energy while staying comfortable",
+                    trigger: "daily at 2:00 PM",
+                    actions: ["Thermostat -> cool to 76°F (peak hours)", "Thermostat -> cool to 72°F (evening)"],
+                    category: "energy"
+                ))
+            }
+            if hasWindowCoverings && !existingNames.contains("summer shade control") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Summer Shade Control",
+                    reason: "Close shades during afternoon sun to reduce cooling load",
+                    trigger: "daily at 12:00 PM",
+                    actions: ["Window coverings -> closed (noon - 5 PM)", "Window coverings -> open (evening)"],
+                    category: "energy"
+                ))
+            }
+
+        case 9, 10, 11: // Fall
+            if hasThermostats && !existingNames.contains("fall transition schedule") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Fall Transition Schedule",
+                    reason: "Transitional weather — adjust heating/cooling for fluctuating temperatures",
+                    trigger: "daily at 7:00 AM",
+                    actions: ["Thermostat -> auto mode 68-74°F"],
+                    category: "comfort"
+                ))
+            }
+            if hasLights && !existingNames.contains("early darkness lights") {
+                suggestions.append(AutomationSuggestion(
+                    name: "Early Darkness Lights",
+                    reason: "Days are getting shorter — turn on lights earlier",
+                    trigger: "daily at sunset",
+                    actions: ["Indoor lights -> on at 50% brightness", "Outdoor lights -> on"],
+                    category: "convenience"
+                ))
+            }
+
+        default:
+            break
+        }
+
+        return suggestions
+    }
+
+    // MARK: - Pattern-Based Suggestions
+
+    /// Generates suggestions by analyzing automation execution patterns from the log.
+    ///
+    /// Detects:
+    /// - Frequently triggered automations (≥10 runs) that may benefit from schedule optimization
+    /// - Automations with high failure rates (>30% failures) that need troubleshooting
+    /// - Time-of-day patterns ("You usually run X at Y time")
+    ///
+    /// - Parameter log: Array of execution log entries to analyze.
+    /// - Returns: Pattern-based `AutomationSuggestion` objects.
+    func generatePatternSuggestions(from log: [AutomationLogEntry]) -> [AutomationSuggestion] {
+        var suggestions: [AutomationSuggestion] = []
+        guard !log.isEmpty else { return suggestions }
+
+        // Count runs per automation
+        var runCounts: [String: Int] = [:]
+        var failCounts: [String: Int] = [:]
+        var timesByAutomation: [String: [Int]] = [:] // hours of day
+
+        let formatter = ISO8601DateFormatter()
+
+        for entry in log {
+            runCounts[entry.automationName, default: 0] += 1
+            failCounts[entry.automationName, default: 0] += entry.failed
+
+            if let date = formatter.date(from: entry.timestamp) {
+                let hour = Calendar.current.component(.hour, from: date)
+                timesByAutomation[entry.automationName, default: []].append(hour)
+            }
+        }
+
+        let existingNames = Swift.Set(existingAutomations.map { $0.name.lowercased() })
+
+        // Detect frequently triggered automations
+        for (name, count) in runCounts where count >= 10 {
+            let suggestionName = "Optimize \(name) Schedule"
+            if !existingNames.contains(suggestionName.lowercased()) {
+                suggestions.append(AutomationSuggestion(
+                    name: suggestionName,
+                    reason: "\(name) has run \(count) times — consider if a fixed schedule would be more efficient",
+                    trigger: "schedule optimization",
+                    actions: ["Review trigger frequency for \(name)"],
+                    category: "energy"
+                ))
+            }
+        }
+
+        // Detect high failure rate automations
+        for (name, runs) in runCounts {
+            let fails = failCounts[name] ?? 0
+            if runs >= 3 && Double(fails) / Double(runs) > 0.3 {
+                let suggestionName = "Troubleshoot \(name)"
+                if !existingNames.contains(suggestionName.lowercased()) {
+                    suggestions.append(AutomationSuggestion(
+                        name: suggestionName,
+                        reason: "\(name) fails \(Int(Double(fails) / Double(runs) * 100))% of the time — check device connectivity",
+                        trigger: "maintenance",
+                        actions: ["Verify device reachability", "Check automation conditions"],
+                        category: "convenience"
+                    ))
+                }
+            }
+        }
+
+        // Detect time-of-day patterns
+        for (name, hours) in timesByAutomation where hours.count >= 5 {
+            let hourCounts = Dictionary(grouping: hours, by: { $0 }).mapValues { $0.count }
+            if let (peakHour, peakCount) = hourCounts.max(by: { $0.value < $1.value }),
+               Double(peakCount) / Double(hours.count) > 0.5 {
+                let suggestionName = "Schedule \(name) at \(peakHour):00"
+                if !existingNames.contains(suggestionName.lowercased()) {
+                    let amPm = peakHour >= 12 ? "\(peakHour == 12 ? 12 : peakHour - 12) PM" : "\(peakHour == 0 ? 12 : peakHour) AM"
+                    suggestions.append(AutomationSuggestion(
+                        name: suggestionName,
+                        reason: "You usually run \(name) around \(amPm) — consider making it automatic",
+                        trigger: "daily at \(amPm)",
+                        actions: ["Auto-trigger \(name)"],
+                        category: "convenience"
+                    ))
+                }
+            }
+        }
+
+        return suggestions
+    }
+
     // MARK: - Energy Insights
 
     /// Generates energy consumption insights by combining live device states with automation execution history.

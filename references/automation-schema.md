@@ -43,6 +43,10 @@ Fires on a cron-style schedule.
 - `0 22 * * 0,6` — weekends at 10:00 PM
 - `0 8 1 * *` — first of every month at 8:00 AM
 
+The engine parses cron expressions and generates a `humanReadable` description automatically
+if one is not provided. Invalid cron expressions (e.g., minute > 59, invalid day ranges) are
+rejected with a descriptive error.
+
 ### Solar Trigger
 
 Fires relative to sunrise or sunset.
@@ -289,13 +293,53 @@ to a warm 60% brightness, heat the house to 72, and unlock the front door. Then 
 
 ## Validation Rules
 
-The automation engine enforces these rules before accepting an automation:
+The automation engine enforces these rules before accepting an automation. All 7 rules are
+fully implemented and run as a pipeline during `automation_create` and `automation_edit`:
 
-1. **Device existence** — Every `deviceUuid` must exist in the current device map
-2. **Characteristic support** — Each device must support the referenced characteristic
-3. **Value range** — Numeric values must be within the device's reported min/max
-4. **Writable check** — Cannot target read-only characteristics (e.g., `currentTemperature` on a thermostat is read-only; `targetTemperature` is writable)
-5. **Unique name** — Automation names must be unique (used as Shortcut identifiers)
-6. **Non-empty actions** — Must have at least one action
-7. **Valid cron** — Schedule triggers must have valid 5-field cron expressions
+1. **Device existence** — Every `deviceUuid` or `deviceName` must match a device in the current device map. If a name doesn't match exactly, the engine uses Levenshtein distance to suggest the closest match (e.g., "Bedroom Lamp" → "Did you mean 'Bedroom Light'?").
+2. **Characteristic support** — Each device must support the referenced characteristic. The engine checks the device's reported characteristic list and returns available characteristics if the requested one is missing.
+3. **Value range** — Numeric values must be within the device's reported min/max (e.g., brightness 0–100, hue 0–360, targetTemperature 10–38°C). The error includes the valid range.
+4. **Writable check** — Cannot target read-only characteristics. For example, `currentTemperature` on a thermostat is read-only; the engine suggests `targetTemperature` instead. Read-only characteristics include `currentTemperature`, `currentHumidity`, `currentLockState`, `currentPosition`, `currentHeatingCoolingState`, `motionDetected`, `contactState`, `lightLevel`, `batteryLevel`, and `outletInUse`.
+5. **Unique name** — Automation names must be unique across the registry. Duplicate names are rejected with an error since names map 1:1 to Shortcut identifiers.
+6. **Non-empty actions** — Must have at least one action. Automations with zero actions are rejected.
+7. **Valid cron** — Schedule triggers must have valid 5-field cron expressions. The parser validates field ranges (minute 0–59, hour 0–23, day 1–31, month 1–12, weekday 0–6) and generates a human-readable description.
+
+## Condition Evaluation
+
+When `automation_test` is called, the `ConditionEvaluator` module checks all conditions
+against live state before executing actions:
+
+### Evaluation Flow
+
+1. Load all conditions from the automation definition
+2. For each condition, query the relevant data source:
+   - **Time conditions** — compared against current system time
+   - **Day-of-week conditions** — compared against current weekday
+   - **Device state conditions** — queries the helper for the device's current characteristic value, then applies the operator (equals, lessThan, greaterThan, etc.)
+   - **Solar conditions** — computes sunrise/sunset for the current date and location, then checks the requirement
+3. If **all** conditions pass, actions are executed in order
+4. If **any** condition fails, the test reports which conditions passed/failed and skips action execution
+
+### Example Output
+
+```json
+{
+  "tested": "Weekday Morning Routine",
+  "conditionResults": [
+    {
+      "type": "deviceState",
+      "description": "Living Room Thermostat currentTemperature < 70",
+      "currentValue": 73,
+      "passed": false,
+      "reason": "Current value 73 is not less than 70"
+    }
+  ],
+  "conditionsPassed": false,
+  "actionsSkipped": true,
+  "message": "1 of 1 conditions failed. Actions were not executed."
+}
+```
+
+Condition evaluation is skipped when testing with raw `actions` (ad-hoc testing without
+a saved automation) since there is no condition context.
 8. **Delay limits** — `delaySeconds` must be between 0 and 3600 (1 hour max)

@@ -2,6 +2,7 @@
 // Handles communication with the HomeKitHelper via Unix domain socket.
 
 import Foundation
+import Logging
 
 /// Client for communicating with the HomeKitHelper process over a Unix domain socket.
 ///
@@ -92,6 +93,7 @@ actor SocketClient {
     ///   - `DecodingError` if the response JSON cannot be decoded.
     func send(command: String, params: [String: AnyCodableValue]? = nil) async throws -> Response {
         let requestId = UUID().uuidString
+        Log.socket.debug("Preparing request", metadata: ["command": "\(command)", "requestId": "\(requestId)"])
         let request = Request(id: requestId, command: command, params: params)
 
         let encoder = JSONEncoder()
@@ -124,19 +126,23 @@ actor SocketClient {
         }
 
         guard connectResult == 0 else {
+            Log.socket.error("Connection failed", metadata: ["path": "\(Self.socketPath)"])
             throw SocketError.connectionFailed(
                 "Could not connect to HomeKitHelper at \(Self.socketPath). " +
                 "Is the HomeKit Automator app running?"
             )
         }
+        Log.socket.debug("Connected to HomeKitHelper", metadata: ["path": "\(Self.socketPath)"])
 
         // Send request
         let bytesSent = requestData.withUnsafeBytes { buffer in
             Darwin.send(socket, buffer.baseAddress!, buffer.count, 0)
         }
         guard bytesSent == requestData.count else {
+            Log.socket.error("Send failed", metadata: ["bytesSent": "\(bytesSent)", "expected": "\(requestData.count)"])
             throw SocketError.sendFailed("Failed to send request")
         }
+        Log.socket.debug("Request sent", metadata: ["bytes": "\(bytesSent)", "command": "\(command)"])
 
         // Read response (with timeout)
         var responseData = Data()
@@ -156,16 +162,20 @@ actor SocketClient {
         }
 
         guard !responseData.isEmpty else {
+            Log.socket.error("No response received", metadata: ["command": "\(command)"])
             throw SocketError.noResponse("No response from HomeKitHelper")
         }
+        Log.socket.debug("Response received", metadata: ["bytes": "\(responseData.count)"])
 
         let decoder = JSONDecoder()
         let response = try decoder.decode(Response.self, from: responseData)
 
         guard response.id == requestId else {
+            Log.socket.error("Response ID mismatch", metadata: ["expected": "\(requestId)", "got": "\(response.id)"])
             throw SocketError.responseMismatch("Response ID mismatch")
         }
 
+        Log.socket.info("Command completed", metadata: ["command": "\(command)", "status": "\(response.status)"])
         return response
     }
 

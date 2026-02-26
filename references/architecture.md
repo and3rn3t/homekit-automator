@@ -15,6 +15,14 @@
                     ┌──────────────▼──────────────┐
                     │    homekitauto CLI (Swift)    │
                     │  Commands → Socket Messages   │
+                    │                               │
+                    │  Key modules:                 │
+                    │  • AutomationValidator        │
+                    │  • ConditionEvaluator         │
+                    │  • AutomationRegistry         │
+                    │  • ShortcutGenerator          │
+                    │  • HomeAnalyzer               │
+                    │  • Logger (swift-log)         │
                     └──────────────┬──────────────┘
                                    │ Unix socket
                     ┌──────────────▼──────────────┐
@@ -22,9 +30,11 @@
                     │                               │
                     │  ┌─────────────────────────┐ │
                     │  │  SwiftUI Menu Bar App    │ │
-                    │  │  - Settings UI           │ │
-                    │  │  - Helper lifecycle      │ │
-                    │  │  - Automation registry    │ │
+                    │  │  - Dashboard view         │ │
+                    │  │  - Settings UI            │ │
+                    │  │  - History / log view     │ │
+                    │  │  - Helper lifecycle mgmt  │ │
+                    │  │  - AutomationStore        │ │
                     │  └────────────┬────────────┘ │
                     │               │ process mgmt  │
                     │  ┌────────────▼────────────┐ │
@@ -33,6 +43,7 @@
                     │  │  - HMHomeManager         │ │
                     │  │  - Socket server         │ │
                     │  │  - Device state cache    │ │
+                    │  │  - State change monitor  │ │
                     │  └────────────┬────────────┘ │
                     └───────────────┼──────────────┘
                                     │
@@ -79,14 +90,16 @@ Format: JSON messages delimited by newline (`\n`)
 | Command | Params | Returns |
 |---------|--------|---------|
 | `status` | none | Bridge status, home names, accessory count |
-| `discover` | none | Full device map: homes, rooms, accessories, characteristics |
-| `get_device` | `name` or `uuid` | Device state with all characteristics |
-| `set_device` | `uuid`, `characteristic`, `value` | Confirmation |
+| `discover` | `home?` | Full device map: homes, rooms, accessories, characteristics |
+| `get_device` | `name` or `uuid`, `home?`, `units?` | Device state with all characteristics |
+| `set_device` | `uuid`, `characteristic`, `value`, `home?`, `units?` | Confirmation |
 | `list_rooms` | `home?` | Rooms with accessory summaries |
 | `list_scenes` | `home?` | Available scenes |
-| `trigger_scene` | `name` or `uuid` | Confirmation |
+| `trigger_scene` | `name` or `uuid`, `home?` | Confirmation |
 | `get_config` | none | Current configuration |
 | `set_config` | key-value pairs | Updated configuration |
+| `state_changes` | `home?` | Recent device state changes |
+| `subscribe` | `device`, `home?` | Subscribe to live device state updates |
 
 ## Helper Process Management
 
@@ -112,11 +125,17 @@ Apple's requirements without displaying any UI.
 1. User: "Every morning at 7am, turn on kitchen lights and set thermostat to 72"
 2. LLM parses intent using SKILL.md guidance -> structured automation JSON
 3. LLM calls `automation_create` MCP tool with the JSON
-4. MCP server invokes `homekitauto automation create --json '{...}'`
+4. MCP server invokes `homekitauto automation create --definition '{...}'`
 5. CLI sends `discover` to helper to validate devices exist
-6. CLI validates all referenced devices and characteristics
+6. CLI runs full validation pipeline:
+   - Device existence check (with Levenshtein fuzzy matching for near-miss suggestions)
+   - Characteristic support and writability verification
+   - Value range enforcement (min/max from device metadata)
+   - Cron expression parsing and validation
+   - Duplicate automation name check
 7. CLI generates Apple Shortcut definition (`.shortcut` file)
-8. CLI registers Shortcut via `shortcuts` CLI or `open shortcuts://` URL scheme
+8. CLI checks for existing Shortcut with same name before import
+9. CLI registers Shortcut via `shortcuts` CLI or `open shortcuts://` URL scheme
 9. CLI saves automation to `~/.config/homekit-automator/automations.json`
 10. Response flows back through MCP to LLM
 11. LLM confirms to user: "Done! Your Morning Routine will run at 7 AM daily."
@@ -132,6 +151,33 @@ This is the key insight: once registered as a Shortcut, the automation is fully 
 It runs even if HomeKit Automator is quit, the Mac is asleep (if using iPhone/iPad via iCloud
 sync), or the AI agent is disconnected.
 
+## Data Flow: Automation Test with Condition Evaluation
+
+1. User (or LLM) calls `automation_test` with an automation name/ID
+2. CLI loads the automation definition from the registry
+3. ConditionEvaluator checks each condition against live state:
+   - Time/day-of-week conditions: evaluated locally
+   - Device state conditions: queries helper for current device values
+   - Solar conditions: checks current time vs. computed sunrise/sunset
+4. If all conditions pass, actions are executed sequentially via the helper
+5. If any condition fails, the test reports which conditions failed and skips actions
+6. Results (condition outcomes + action results) flow back through MCP to the LLM
+
+## Device State Monitoring
+
+The HomeKitHelper process monitors device state changes in real time using
+`HMHomeManager` delegate callbacks:
+
+1. **`state_changes`** command — Returns a list of recent state changes (device, characteristic,
+   old value, new value, timestamp). Useful for reviewing what happened while the agent
+   was offline.
+2. **`subscribe`** command — Opens a persistent socket channel for live device updates.
+   The helper pushes change events as they occur. Used by `device_state` triggers to
+   fire automations when a device reaches a specified value.
+
+This architecture allows the app to react to physical device changes (e.g., someone
+manually unlocking a door) without polling.
+
 ## Configuration Storage
 
 ```
@@ -142,6 +188,22 @@ sync), or the AI agent is disconnected.
 └── logs/
     └── automation-log.json  # History of automation executions and outcomes
 ```
+
+## Structured Logging
+
+The CLI uses [swift-log](https://github.com/apple/swift-log) for structured logging.
+Log levels are controlled via the `--log-level` flag or the `LOG_LEVEL` environment variable:
+
+| Level | Usage |
+|-------|-------|
+| `trace` | Socket message payloads, raw HomeKit values |
+| `debug` | Validation steps, condition evaluation details |
+| `info` | Command execution, automation lifecycle events (default) |
+| `warning` | Recoverable errors, device unreachable, deprecated flags |
+| `error` | Command failures, validation rejections |
+| `critical` | Socket connection failure, helper crash |
+
+Logs are written to stderr by default. Set `LOG_LEVEL=debug` for verbose troubleshooting.
 
 ## Security Considerations
 

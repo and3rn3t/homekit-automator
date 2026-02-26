@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+
+      - name: Build CLI (Release)
+        run: swift build -c release --disable-sandbox
+        working-directory: scripts/swift
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Tests
+        run: swift test
+        working-directory: scripts/swift
+
+      - name: Prepare Release Artifacts
+        run: |
+          mkdir -p release-artifacts
+
+          # CLI binary
+          cp scripts/swift/.build/release/homekitauto release-artifacts/
+
+          # MCP server
+          mkdir -p release-artifacts/mcp-server
+          cp scripts/mcp-server/index.js release-artifacts/mcp-server/
+          cp scripts/mcp-server/package.json release-artifacts/mcp-server/
+
+          # OpenClaw plugin
+          cp scripts/openclaw-plugin/plugin.json release-artifacts/
+
+          # Documentation
+          cp SKILL.md release-artifacts/
+          cp README.md release-artifacts/
+          cp SETUP.md release-artifacts/
+
+          # Create tarball
+          cd release-artifacts
+          tar -czf ../homekit-automator-${GITHUB_REF_NAME}-macos-arm64.tar.gz .
+          cd ..
+
+          # Create zip
+          cd release-artifacts
+          zip -r ../homekit-automator-${GITHUB_REF_NAME}-macos-arm64.zip .
+          cd ..
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          echo "## HomeKit Automator ${GITHUB_REF_NAME}" > release-notes.md
+          echo "" >> release-notes.md
+          echo "### Installation" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "#### Via Homebrew" >> release-notes.md
+          echo '```bash' >> release-notes.md
+          echo "brew tap and3rn3t/homekit-automator" >> release-notes.md
+          echo "brew install homekit-automator" >> release-notes.md
+          echo '```' >> release-notes.md
+          echo "" >> release-notes.md
+          echo "#### Manual Install" >> release-notes.md
+          echo "1. Download the tarball or zip below" >> release-notes.md
+          echo "2. Extract and copy \`homekitauto\` to a directory in your PATH" >> release-notes.md
+          echo "3. Build and install the HomeKitHelper app (see SETUP.md)" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### Included Artifacts" >> release-notes.md
+          echo "- \`homekitauto\` — CLI binary (macOS arm64)" >> release-notes.md
+          echo "- \`mcp-server/\` — MCP server for AI agent integration" >> release-notes.md
+          echo "- \`plugin.json\` — OpenClaw plugin manifest" >> release-notes.md
+          echo "- \`SKILL.md\` — Skill documentation" >> release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: |
+            homekit-automator-${{ github.ref_name }}-macos-arm64.tar.gz
+            homekit-automator-${{ github.ref_name }}-macos-arm64.zip
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

@@ -181,6 +181,10 @@ struct TriggerScene: AsyncParsableCommand {
     @Argument(help: "Scene name or UUID")
     var scene: String
 
+    /// Optional home name to scope the scene lookup to a specific home
+    @Option(name: .long, help: "Home name to scope scene lookup")
+    var home: String?
+
     /// When true, returns trigger result as formatted JSON instead of simple confirmation
     @Flag(name: .long, help: "Output as JSON")
     var json = false
@@ -188,9 +192,13 @@ struct TriggerScene: AsyncParsableCommand {
     /// Sends trigger request to socket bridge for the scene
     func run() async throws {
         let client = SocketClient()
+        var params: [String: AnyCodableValue] = ["name": .string(scene)]
+        if let home = home {
+            params["home"] = .string(home)
+        }
         let response = try await client.send(
             command: "trigger_scene",
-            params: ["name": .string(scene)]
+            params: params
         )
 
         guard response.isOk else {

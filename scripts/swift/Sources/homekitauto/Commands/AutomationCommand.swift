@@ -528,12 +528,17 @@ struct AutomationTest: AsyncParsableCommand {
     @Option(name: .long, help: "Raw actions JSON to test ad-hoc")
     var actions: String?
 
+    /// When true, execute actions even if conditions are not met
+    @Flag(name: .long, help: "Execute even if conditions are not met")
+    var force = false
+
     /// Loads automation or parses ad-hoc actions and executes them sequentially
     func run() async throws {
         let client = SocketClient()
 
         // Load actions from automation registry or parse ad-hoc JSON
         var actionsToTest: [AutomationAction] = []
+        var conditionsToCheck: [AutomationCondition] = []
 
         if let actionsJson = actions {
             // Ad-hoc test from raw actions JSON
@@ -553,6 +558,42 @@ struct AutomationTest: AsyncParsableCommand {
                 throw ValidationError("Automation not found: \(identifier)")
             }
             actionsToTest = automation.actions
+            conditionsToCheck = automation.conditions ?? []
+        }
+
+        // Evaluate conditions before executing actions
+        var conditionResults: [[String: AnyCodableValue]] = []
+        var conditionsAllMet = true
+
+        if !conditionsToCheck.isEmpty {
+            let evaluator = ConditionEvaluator()
+            let evalResult = try await evaluator.evaluate(conditions: conditionsToCheck, using: client)
+            conditionsAllMet = evalResult.allMet
+
+            for r in evalResult.results {
+                conditionResults.append([
+                    "condition": .string(r.condition.humanReadable),
+                    "type": .string(r.condition.type),
+                    "met": .bool(r.met),
+                    "reason": .string(r.reason)
+                ])
+            }
+
+            if !conditionsAllMet && !force {
+                // Conditions not met and --force not set — report and exit
+                let output: [String: AnyCodableValue] = [
+                    "tested": .string(name ?? id ?? "ad-hoc"),
+                    "conditionsEvaluated": .array(conditionResults.map { .dictionary($0) }),
+                    "conditionsMet": .bool(false),
+                    "skipped": .bool(true),
+                    "reason": .string("Conditions not met. Use --force to execute anyway.")
+                ]
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let jsonData = try encoder.encode(output)
+                print(String(data: jsonData, encoding: .utf8) ?? "{}")
+                return
+            }
         }
 
         // Execute each action sequentially and collect results
@@ -602,13 +643,21 @@ struct AutomationTest: AsyncParsableCommand {
         let succeeded = results.filter { $0["success"]?.boolValue == true }.count
         let failed = results.count - succeeded
 
-        // Output test results
-        let output: [String: AnyCodableValue] = [
+        // Output test results (include condition evaluation if any)
+        var output: [String: AnyCodableValue] = [
             "tested": .string(name ?? id ?? "ad-hoc"),
             "results": .array(results.map { .dictionary($0) }),
             "succeeded": .int(succeeded),
             "failed": .int(failed)
         ]
+
+        if !conditionResults.isEmpty {
+            output["conditionsEvaluated"] = .array(conditionResults.map { .dictionary($0) })
+            output["conditionsMet"] = .bool(conditionsAllMet)
+            if !conditionsAllMet && force {
+                output["forcedExecution"] = .bool(true)
+            }
+        }
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

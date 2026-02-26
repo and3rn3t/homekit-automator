@@ -1,7 +1,7 @@
 {
   "name": "homekit-automator",
-  "version": "1.0.0",
-  "description": "Smart HomeKit automation with natural language — control devices, create automations registered as Apple Shortcuts, get energy insights and suggestions",
+  "version": "1.1.0",
+  "description": "Smart HomeKit automation with natural language — control devices, create automations registered as Apple Shortcuts, get energy insights and suggestions. Multi-home support, full validation pipeline, condition evaluation, and structured logging.",
   "author": "homekit-automator",
   "license": "MIT",
   "homepage": "https://github.com/homekit-automator/homekit-automator",
@@ -24,7 +24,7 @@
   "bins": {
     "homekitauto": {
       "description": "HomeKit Automator CLI — device control, automation management, and home intelligence",
-      "installInstructions": "Build from source: cd scripts/swift && swift build -c release, then copy .build/release/homekitauto to /usr/local/bin/",
+      "installInstructions": "Install via Homebrew: brew install homekit-automator/tap/homekit-automator. Or build from source: cd scripts/swift && swift build -c release, then copy .build/release/homekitauto to /usr/local/bin/",
       "platforms": {
         "macos": {
           "source": "scripts/swift/.build/release/homekitauto"
@@ -38,6 +38,48 @@
     "system": ["macos>=14.0"],
     "entitlements": ["com.apple.developer.homekit"]
   },
+  "features": [
+    "Full HomeKit device discovery and control (lights, thermostats, locks, doors, fans, sensors, etc.)",
+    "Automation engine with cron, solar, manual, and device-state triggers",
+    "Apple Shortcuts registration with existence check before import",
+    "Full validation pipeline: device existence with Levenshtein fuzzy match, characteristic support/writability, value ranges, cron parsing",
+    "Condition evaluation at runtime during automation test",
+    "Multi-home support with --home flag threaded through all commands",
+    "Temperature F↔C conversion with --units option",
+    "Enhanced suggestion engine with seasonal and pattern-based suggestions",
+    "Device state monitoring (state_changes, subscribe socket commands)",
+    "Energy history with week-over-week analysis",
+    "Duplicate automation name enforcement",
+    "Structured logging via swift-log",
+    "SwiftUI menu bar app with dashboard, settings, and history views",
+    "GitHub Actions CI/CD pipeline",
+    "50 Swift unit tests, 14 MCP integration tests, 24 evals"
+  ],
+  "changelog": {
+    "1.1.0": [
+      "Fixed automation edit to decode and apply new actions/triggers",
+      "Renamed --json to --definition for automation create inline JSON",
+      "Fixed device_status room routing",
+      "Consolidated AnyCodableJSON → AnyCodableValue",
+      "Added shortcut existence check before import",
+      "Added temperature F↔C conversion with --units option",
+      "Full validation pipeline (device existence with Levenshtein fuzzy match, characteristic support/writability, value ranges, cron parsing)",
+      "Duplicate name enforcement in automation registry",
+      "Condition evaluation at runtime in automation test",
+      "Enhanced suggestion engine with seasonal + pattern-based suggestions",
+      "Multi-home support (--home threaded through all commands)",
+      "Device state monitoring (state_changes, subscribe socket commands)",
+      "Energy history with week-over-week analysis",
+      "Structured logging via swift-log",
+      "50 Swift tests, 14 MCP integration tests, 24 evals",
+      "GitHub Actions CI/CD pipeline",
+      "Homebrew formula",
+      "Full SwiftUI menu bar app (dashboard, settings, history, helper lifecycle)"
+    ],
+    "1.0.0": [
+      "Initial release with core HomeKit bridge, CLI, MCP server, automation engine, and Shortcuts integration"
+    ]
+  },
   "tags": [
     "homekit",
     "apple",
@@ -45,6 +87,8 @@
     "automation",
     "shortcuts",
     "iot",
-    "macos"
+    "macos",
+    "energy",
+    "multi-home"
   ]
 }
