@@ -195,24 +195,6 @@ actor SocketClient {
         Log.socket.info("Command completed", metadata: ["command": "\(command)", "status": "\(response.status)"])
         return response
     }
-
-    /// Lightweight health check to determine if the HomeKitHelper is reachable.
-    ///
-    /// Sends a "status" command to the helper and returns true only if a successful response is received
-    /// within the normal timeout. This is useful for validating that the helper process is running and
-    /// responsive before attempting other operations.
-    ///
-    /// - Returns: True if the helper responded with status "ok"; false if any error occurred (connection failed,
-    ///   timeout, helper error, etc.).
-    ///   Note: A false return does not distinguish between transient failures and persistent unavailability.
-    func isConnected() async -> Bool {
-        do {
-            let response = try await send(command: "status")
-            return response.isOk
-        } catch {
-            return false
-        }
-    }
 }
 
 // MARK: - Errors

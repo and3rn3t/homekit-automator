@@ -75,10 +75,7 @@ struct Suggest: AsyncParsableCommand {
 
         // Output suggestions in requested format
         if json {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let jsonData = try encoder.encode(["suggestions": suggestions])
-            print(String(data: jsonData, encoding: .utf8) ?? "{}")
+            try printJSON(["suggestions": suggestions])
             return
         }
 
@@ -177,10 +174,7 @@ struct Energy: AsyncParsableCommand {
             if let hd = historyData {
                 output["history"] = .dictionary(hd)
             }
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let jsonData = try encoder.encode(output)
-            print(String(data: jsonData, encoding: .utf8) ?? "{}")
+            try printJSON(output)
             return
         }
 
@@ -446,11 +440,8 @@ struct Config: AsyncParsableCommand {
 
             // Output in requested format
             if json {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
                 if let data = response.data {
-                    let jsonData = try encoder.encode(data)
-                    print(String(data: jsonData, encoding: .utf8) ?? "{}")
+                    try printJSON(data)
                 }
             } else if let config = response.data?.dictionaryValue {
                 // Display configuration as sorted key-value pairs

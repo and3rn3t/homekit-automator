@@ -43,11 +43,8 @@ struct Status: AsyncParsableCommand {
 
         // Output response in requested format
         if json {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             if let data = response.data {
-                let jsonData = try encoder.encode(data)
-                print(String(data: jsonData, encoding: .utf8) ?? "{}")
+                try printJSON(data)
             }
         } else {
             // Format response as human-readable status report

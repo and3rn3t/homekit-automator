@@ -12,7 +12,7 @@
 //
 // Dependencies:
 //   - swift-argument-parser: Provides the CLI subcommand infrastructure
-//   - swift-log: Structured logging (currently unused but available for debug builds)
+//   - swift-log: Structured logging via swift-log
 
 import PackageDescription
 
@@ -57,20 +57,6 @@ let package = Package(
                 .unsafeFlags(["-parse-as-library"])
             ]
         ),
-
-        // Main app target — SwiftUI menu bar application (future)
-        // NOTE: This target is built via Xcode, not SPM, because it requires
-        // app bundle signing with the HomeKit entitlement. SPM executables cannot
-        // carry entitlements. See the Xcode project in Sources/HomeKitAutomator/.
-        //
-        // .executableTarget(
-        //     name: "HomeKitAutomator",
-        //     path: "Sources/HomeKitAutomator"
-        // ),
-
-        // Helper target — Mac Catalyst app that holds the HomeKit entitlement
-        // and runs the HMHomeManager. Built via XcodeGen + xcodebuild.
-        // See Sources/HomeKitHelper/project.yml for the Xcode project spec.
 
         // Unit tests for CLI models, registry operations, and codable roundtrips.
         // Run with: swift test

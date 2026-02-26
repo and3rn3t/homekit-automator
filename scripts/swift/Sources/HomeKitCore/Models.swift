@@ -259,9 +259,6 @@ public struct AutomationAction: Codable, Sendable {
     /// UUID of the scene to trigger (only when `type` is "scene").
     public let sceneUuid: String?
 
-    /// Convenience accessor for the value in its Codable form (identity — value is already AnyCodableValue).
-    public var codableValue: AnyCodableValue { value }
-
     public init(type: String? = nil,
                 deviceUuid: String = "",
                 deviceName: String = "",

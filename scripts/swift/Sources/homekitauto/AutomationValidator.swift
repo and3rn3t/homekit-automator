@@ -648,41 +648,8 @@ struct AutomationValidator {
     func validateDefinition(
         _ definition: AutomationDefinition, deviceMap: [[String: AnyCodableValue]]
     ) throws {
-        // Must have at least one action
-        guard !definition.actions.isEmpty else {
-            throw AutomationValidationError.emptyActions
-        }
-
-        // Validate cron expression for schedule triggers
-        if definition.trigger.type == "schedule", let cron = definition.trigger.cron {
-            try validateCronExpression(cron)
-        }
-
-        // Validate each action
-        for action in definition.actions {
-            // Skip scene actions — they don't target individual devices
-            if action.type == "scene" { continue }
-
-            // Validate delay bounds
-            if action.delaySeconds < 0 || action.delaySeconds > 3600 {
-                throw AutomationValidationError.invalidDelaySeconds(action.delaySeconds)
-            }
-
-            // PR5: Device existence
-            try validateDeviceExists(deviceName: action.deviceName, deviceMap: deviceMap)
-
-            // PR6: Characteristic support and writability
-            if let deviceInfo = findDevice(named: action.deviceName, in: deviceMap) {
-                try validateCharacteristic(
-                    characteristic: action.characteristic,
-                    deviceName: action.deviceName,
-                    deviceInfo: deviceInfo
-                )
-            }
-
-            // PR7: Value range
-            try validateValueRange(characteristic: action.characteristic, value: action.value)
-        }
+        try validateTrigger(definition.trigger)
+        try validateActions(definition.actions, deviceMap: deviceMap)
     }
 
     /// Validates an array of actions against the device map.

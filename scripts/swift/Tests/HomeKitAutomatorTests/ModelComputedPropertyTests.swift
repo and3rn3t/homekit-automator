@@ -107,9 +107,9 @@ final class ModelComputedPropertyTests: XCTestCase {
         XCTAssertNotEqual(entry1.id, entry3.id, "Different automation IDs should produce different IDs")
     }
 
-    // MARK: - AutomationAction.codableValue
+    // MARK: - AutomationAction.value
 
-    func testCodableValueIdentity() {
+    func testValueIdentity() {
         let action = AutomationAction(
             deviceUuid: "dev-1",
             deviceName: "Light",
@@ -117,7 +117,7 @@ final class ModelComputedPropertyTests: XCTestCase {
             value: .int(75),
             delaySeconds: 0
         )
-        XCTAssertEqual(action.codableValue, .int(75))
+        XCTAssertEqual(action.value, .int(75))
     }
 
     // MARK: - AutomationSuggestion Codable Round-Trip

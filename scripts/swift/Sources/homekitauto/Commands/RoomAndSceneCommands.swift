@@ -54,11 +54,8 @@ struct Rooms: AsyncParsableCommand {
 
         // Output rooms in requested format
         if json {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             if let data = response.data {
-                let jsonData = try encoder.encode(data)
-                print(String(data: jsonData, encoding: .utf8) ?? "{}")
+                try printJSON(data)
             }
             return
         }
@@ -131,11 +128,8 @@ struct Scenes: AsyncParsableCommand {
 
         // Output scenes in requested format
         if json {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             if let data = response.data {
-                let jsonData = try encoder.encode(data)
-                print(String(data: jsonData, encoding: .utf8) ?? "{}")
+                try printJSON(data)
             }
             return
         }
@@ -207,11 +201,8 @@ struct TriggerScene: AsyncParsableCommand {
 
         // Output result in requested format
         if json {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted]
             if let data = response.data {
-                let jsonData = try encoder.encode(data)
-                print(String(data: jsonData, encoding: .utf8) ?? "{}")
+                try printJSON(data, sortedKeys: false)
             }
         } else {
             print("Triggered scene: \(scene)")

@@ -12,7 +12,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, symlinkSync, chmodSync, rmSync } from "node:fs";
+import { mkdtempSync, symlinkSync, chmodSync, rmSync, readFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -170,7 +170,10 @@ describe("MCP Server Integration Tests", () => {
     assert.equal(response.result.protocolVersion, "2024-11-05");
     assert.deepStrictEqual(response.result.capabilities, { tools: {} });
     assert.equal(response.result.serverInfo.name, "homekit-automator");
-    assert.equal(response.result.serverInfo.version, "1.1.0");
+    const expectedVersion = JSON.parse(
+      readFileSync(new URL("../../mcp-server/package.json", import.meta.url), "utf8")
+    ).version;
+    assert.equal(response.result.serverInfo.version, expectedVersion);
 
     // Send the initialized notification (no response expected)
     await client.sendNotification("notifications/initialized");

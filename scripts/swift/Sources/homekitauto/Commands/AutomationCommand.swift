@@ -161,10 +161,7 @@ struct AutomationCreate: AsyncParsableCommand {
             "actionCount": .int(definition.actions.count)
         ]
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let outputData = try encoder.encode(result)
-        print(String(data: outputData, encoding: .utf8) ?? "{}")
+        try printJSON(result)
     }
 
     /// Reads automation definition from file if path is provided
@@ -232,10 +229,7 @@ struct AutomationList: AsyncParsableCommand {
         }
 
         if json {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let jsonData = try encoder.encode(automations)
-            print(String(data: jsonData, encoding: .utf8) ?? "[]")
+            try printJSON(automations)
             return
         }
 
@@ -420,10 +414,7 @@ struct AutomationEdit: AsyncParsableCommand {
 
         try registry.update(automation)
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let jsonData = try encoder.encode(automation)
-        print(String(data: jsonData, encoding: .utf8) ?? "{}")
+        try printJSON(automation)
     }
 }
 
@@ -588,10 +579,7 @@ struct AutomationTest: AsyncParsableCommand {
                     "skipped": .bool(true),
                     "reason": .string("Conditions not met. Use --force to execute anyway.")
                 ]
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                let jsonData = try encoder.encode(output)
-                print(String(data: jsonData, encoding: .utf8) ?? "{}")
+                try printJSON(output)
                 return
             }
         }
@@ -627,7 +615,7 @@ struct AutomationTest: AsyncParsableCommand {
                 params: [
                     "uuid": .string(action.deviceUuid),
                     "characteristic": .string(action.characteristic),
-                    "value": action.codableValue
+                    "value": action.value
                 ]
             )
 
@@ -659,9 +647,6 @@ struct AutomationTest: AsyncParsableCommand {
             }
         }
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let jsonData = try encoder.encode(output)
-        print(String(data: jsonData, encoding: .utf8) ?? "{}")
+        try printJSON(output)
     }
 }
