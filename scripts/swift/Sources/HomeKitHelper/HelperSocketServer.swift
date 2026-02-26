@@ -14,10 +14,44 @@ import Foundation
 /// - DispatchSemaphore bridges low-level GCD socket code with Swift async/await
 ///
 /// SOCKET PROTOCOL:
-/// Listens on /tmp/homekitauto.sock for newline-delimited JSON commands.
+/// Listens on a Unix domain socket in ~/Library/Application Support/homekit-automator/ for newline-delimited JSON commands.
 /// Each line is a complete JSON request; responses are sent back as JSON-NL.
 class HelperSocketServer {
-    private let socketPath = "/tmp/homekitauto.sock"
+    /// Socket path in user-scoped Application Support directory.
+    /// Must match SocketConstants.defaultPath from the CLI target.
+    private static var socketPath: String {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("homekit-automator")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("homekitauto.sock").path
+    }
+
+    /// Path to the authentication token file.
+    private static var tokenPath: String {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("homekit-automator/.auth_token").path
+    }
+
+    /// Read or create the shared authentication token. Must match SocketConstants.getOrCreateToken().
+    private static func getOrCreateToken() -> String {
+        let path = tokenPath
+        if let existing = try? String(contentsOfFile: path, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+           !existing.isEmpty {
+            return existing
+        }
+        let token = UUID().uuidString
+        try? token.write(toFile: path, atomically: true, encoding: .utf8)
+        chmod(path, 0o600)
+        return token
+    }
+
+    /// Validate an incoming request's token against the stored token.
+    private static func validateToken(_ requestToken: String?) -> Bool {
+        guard let requestToken = requestToken, !requestToken.isEmpty else { return false }
+        let expected = getOrCreateToken()
+        return requestToken == expected
+    }
+
     /// Reference to the HomeKitManager that processes all commands
     private let homeKitManager: HomeKitManager
     /// Low-level socket file descriptor for Unix domain socket
@@ -31,9 +65,17 @@ class HelperSocketServer {
         self.homeKitManager = homeKitManager
     }
 
-    /// Creates the socket, binds to /tmp/homekitauto.sock with 0o600 permissions, and begins accepting connections.
+    /// Creates the socket, binds to the Application Support socket path with 0o600 permissions, and begins accepting connections.
     /// Accepts clients on a background GCD queue without blocking the main thread.
     func start() {
+        let socketPath = Self.socketPath
+
+        // Warn about and clean up legacy socket path
+        if FileManager.default.fileExists(atPath: "/tmp/homekitauto.sock") {
+            print("[SocketServer] WARNING: Legacy socket found at /tmp/homekitauto.sock — please remove it. Socket has moved to \(socketPath)")
+            unlink("/tmp/homekitauto.sock")
+        }
+
         // Remove existing socket file
         unlink(socketPath)
 
@@ -92,7 +134,7 @@ class HelperSocketServer {
             close(serverSocket)
             serverSocket = -1
         }
-        unlink(socketPath)
+        unlink(Self.socketPath)
         print("[SocketServer] Stopped.")
     }
 
@@ -167,10 +209,18 @@ class HelperSocketServer {
             let id: String
             let command: String
             let params: [String: AnyCodableValue]?
+            let token: String?
         }
 
         guard let request = try? JSONDecoder().decode(Request.self, from: data) else {
             sendError(clientSocket, id: "unknown", message: "Invalid request JSON")
+            return
+        }
+
+        // Validate authentication token
+        guard Self.validateToken(request.token) else {
+            print("[SocketServer] Rejected unauthorized request for command: \(request.command)")
+            sendError(clientSocket, id: request.id, message: "Unauthorized: invalid or missing authentication token")
             return
         }
 

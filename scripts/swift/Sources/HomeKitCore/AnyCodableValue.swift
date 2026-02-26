@@ -1,9 +1,8 @@
 // AnyCodableValue.swift
-// HomeKitHelper — This file should match HomeKitCore/AnyCodableValue.swift — do not edit independently.
+// HomeKitCore — Canonical type-erased Codable wrapper for heterogeneous JSON values.
 //
-// This is a copy of the canonical AnyCodableValue from Sources/HomeKitCore/AnyCodableValue.swift.
-// HomeKitHelper is built via Xcode/XcodeGen and cannot import the SPM HomeKitCore module directly.
-// Keep this file in sync with the canonical version.
+// This is the single source of truth for AnyCodableValue. All targets (CLI, Helper, GUI)
+// should use or mirror this file. Do not create independent copies.
 
 import Foundation
 
@@ -23,7 +22,7 @@ import Foundation
 ///
 /// Used throughout the socket protocol and command response handling where the exact structure of values cannot be
 /// determined statically, enabling flexible HomeKit automation across diverse accessory types.
-enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
+public enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
     /// String value. Typically used for names, identifiers, modes (e.g., "heating", "cooling"),
     /// and other textual HomeKit characteristic values.
     case string(String)
@@ -53,7 +52,7 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
 
     // MARK: - CustomStringConvertible
 
-    var description: String {
+    public var description: String {
         switch self {
         case .string(let s): return s
         case .int(let i): return "\(i)"
@@ -68,7 +67,7 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
     // MARK: - Display String
 
     /// Returns a human-readable string representation of the value, with formatted doubles.
-    var displayString: String {
+    public var displayString: String {
         switch self {
         case .string(let val): return val
         case .int(let val): return "\(val)"
@@ -83,20 +82,22 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
     // MARK: - Typed Accessors
 
     /// Extracts the string value, or returns nil if this value is not a string.
-    var stringValue: String? {
+    public var stringValue: String? {
         if case .string(let s) = self { return s }
         return nil
     }
 
     /// Extracts the integer value, or returns nil if this value is not an integer.
-    var intValue: Int? {
+    public var intValue: Int? {
         if case .int(let i) = self { return i }
         return nil
     }
 
     /// Extracts the double value, or returns nil if this value is not numeric.
     /// Special behavior: if the value is an integer, it is automatically coerced to a Double.
-    var doubleValue: Double? {
+    /// This is useful for commands that require fractional values (temperatures, percentages) but receive
+    /// whole numbers from HomeKit. For example, brightness (integer 75) can be treated as (double 75.0).
+    public var doubleValue: Double? {
         switch self {
         case .double(let d): return d
         case .int(let i): return Double(i)
@@ -105,19 +106,19 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
     }
 
     /// Extracts the boolean value, or returns nil if this value is not a boolean.
-    var boolValue: Bool? {
+    public var boolValue: Bool? {
         if case .bool(let b) = self { return b }
         return nil
     }
 
     /// Extracts the array value, or returns nil if this value is not an array.
-    var arrayValue: [AnyCodableValue]? {
+    public var arrayValue: [AnyCodableValue]? {
         if case .array(let a) = self { return a }
         return nil
     }
 
     /// Extracts the dictionary value, or returns nil if this value is not a dictionary.
-    var dictionaryValue: [String: AnyCodableValue]? {
+    public var dictionaryValue: [String: AnyCodableValue]? {
         if case .dictionary(let d) = self { return d }
         return nil
     }
@@ -126,7 +127,7 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
 
     /// Extracts the underlying Swift value (not AnyCodableValue).
     /// Useful for passing to HomeKit characteristic writers that expect Any type.
-    var rawValue: Any {
+    public var rawValue: Any {
         switch self {
         case .string(let s): return s
         case .int(let i): return i
@@ -141,7 +142,20 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
     // MARK: - Codable
 
     /// Decodes a JSON value into the appropriate AnyCodableValue case using a priority-based strategy.
-    init(from decoder: Decoder) throws {
+    ///
+    /// The decoder attempts to decode in this priority order:
+    /// 1. **null**: Returns `.null` if the JSON value is explicitly null.
+    /// 2. **bool**: Returns `.bool` if the value decodes as a JSON boolean (true/false).
+    /// 3. **int**: Returns `.int` if the value decodes as a JSON number without a fractional part.
+    /// 4. **double**: Returns `.double` if the value decodes as a JSON floating-point number.
+    /// 5. **string**: Returns `.string` if the value is a JSON string.
+    /// 6. **array**: Returns `.array` if the value is a JSON array (recursively decoding elements).
+    /// 7. **dict**: Returns `.dictionary` if the value is a JSON object (recursively decoding values).
+    ///
+    /// If none of these succeed, a `DecodingError.dataCorruptedError` is thrown.
+    /// This priority order ensures that numbers are captured at the most specific type first (bool > int > double)
+    /// and prevents numeric values from accidentally being treated as strings.
+    public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
 
         if container.decodeNil() {
@@ -166,7 +180,7 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case .string(let s): try container.encode(s)

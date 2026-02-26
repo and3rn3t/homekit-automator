@@ -110,15 +110,18 @@ struct LogEntryRow: View {
         return .red
     }
 
+    private static let isoFormatter = ISO8601DateFormatter()
+    private static let displayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     private var formattedTimestamp: String {
-        let isoFormatter = ISO8601DateFormatter()
-        guard let date = isoFormatter.date(from: entry.timestamp) else {
+        guard let date = Self.isoFormatter.date(from: entry.timestamp) else {
             return entry.timestamp
         }
-
-        let displayFormatter = DateFormatter()
-        displayFormatter.dateStyle = .medium
-        displayFormatter.timeStyle = .short
-        return displayFormatter.string(from: date)
+        return Self.displayFormatter.string(from: date)
     }
 }

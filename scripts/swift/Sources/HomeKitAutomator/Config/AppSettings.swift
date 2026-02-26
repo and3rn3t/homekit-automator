@@ -39,7 +39,12 @@ enum AppSettingsDefaults {
     static let defaultHomeName = ""
     static let temperatureUnit = TemperatureUnit.celsius.rawValue
     static let launchAtLogin = false
-    static let socketPath = "/tmp/homekitauto.sock"
+    static let socketPath: String = {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("homekit-automator")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("homekitauto.sock").path
+    }()
     static let logRetentionDays = 30
     static let maxHelperRestarts = 5
 }

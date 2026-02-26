@@ -14,7 +14,7 @@
  * This design keeps the MCP layer zero-dependency (no npm packages required) and makes
  * it easy to test tools independently via the CLI.
  *
- * Exposes 10 tools across three categories:
+ * Exposes 11 tools across three categories:
  *   - Device control:  home_discover, device_status, device_control, scene_trigger
  *   - Automation CRUD: automation_create, automation_list, automation_edit, automation_delete, automation_test
  *   - Intelligence:    home_suggest, energy_summary
@@ -35,8 +35,23 @@
 import { execFile } from "node:child_process"; // Spawns the CLI as a child process
 import { promisify } from "node:util";          // Converts callback-based execFile to async/await
 import { createInterface } from "node:readline"; // Reads stdin line-by-line for JSON-RPC messages
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 const exec = promisify(execFile);
+
+// ─── Version & Configuration ─────────────────────────────────────────────────
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
+const VERSION = pkg.version;
+
+/** CLI timeout in ms. Override with HOMEKITAUTO_TIMEOUT env var. Default: 60s. */
+const CLI_TIMEOUT = parseInt(process.env.HOMEKITAUTO_TIMEOUT || '60000', 10);
+
+/** Track active CLI child processes for graceful shutdown. */
+const activeProcesses = new Set();
 
 /** Path to the homekitauto CLI binary. Must be on $PATH or an absolute path. */
 const CLI = "homekitauto";
@@ -296,10 +311,14 @@ const TOOLS = [
  * @throws {Error} If the CLI exits non-zero or times out
  */
 async function runCli(args) {
+  let child;
   try {
-    const { stdout, stderr } = await exec(CLI, [...args, "--json"], {
-      timeout: 30000,
+    const childPromise = exec(CLI, [...args, "--json"], {
+      timeout: CLI_TIMEOUT,
     });
+    child = childPromise.child;
+    activeProcesses.add(child);
+    const { stdout, stderr } = await childPromise;
     if (stderr) {
       console.error(`[MCP] CLI stderr: ${stderr}`);
     }
@@ -308,6 +327,8 @@ async function runCli(args) {
     throw new Error(
       `CLI error: ${error.stderr || error.message}`
     );
+  } finally {
+    if (child) activeProcesses.delete(child);
   }
 }
 
@@ -327,6 +348,8 @@ async function runCli(args) {
  * @throws {Error} If the tool name is unknown or the CLI fails
  */
 async function handleTool(name, args) {
+  validateArgs(name, args);
+
   switch (name) {
     // ── Device Control Tools ──
 
@@ -446,9 +469,39 @@ async function handleTool(name, args) {
 //   - tools/list:              Returns the TOOLS array with schemas
 //   - tools/call:              Dispatches to handleTool() and wraps the result
 
+// ─── Input Validation ────────────────────────────────────────────────────────
+
+/**
+ * Validate that required arguments are present for a given tool.
+ *
+ * @param {string} toolName - The MCP tool name
+ * @param {object} args - The arguments provided by the caller
+ * @throws {Error} If a required parameter is missing
+ */
+function validateArgs(toolName, args) {
+  const required = {
+    'device_status': [],
+    'device_control': ['device', 'characteristic', 'value'],
+    'scene_trigger': ['scene'],
+    'automation_create': ['name', 'trigger', 'actions'],
+    'automation_edit': ['changes'],
+    'automation_delete': [],
+    'automation_test': [],
+    'home_discover': [],
+    'home_suggest': [],
+    'automation_list': [],
+    'energy_summary': []
+  };
+  const reqs = required[toolName] || [];
+  for (const param of reqs) {
+    if (args[param] === undefined || args[param] === null) {
+      throw new Error(`Missing required parameter: ${param}`);
+    }
+  }
+}
+
 /** Read stdin line-by-line. Each line is a complete JSON-RPC message. */
 const rl = createInterface({ input: process.stdin });
-let buffer = "";
 
 rl.on("line", async (line) => {
   try {
@@ -493,13 +546,16 @@ async function handleMessage(message) {
           },
           serverInfo: {
             name: "homekit-automator",
-            version: "1.0.0",
+            version: VERSION,
           },
         },
       };
 
     case "notifications/initialized":
       return null; // No response needed
+
+    case "ping":
+      return { jsonrpc: "2.0", id, result: {} };
 
     case "tools/list":
       return {
@@ -549,5 +605,16 @@ async function handleMessage(message) {
       };
   }
 }
+
+// ─── Graceful Shutdown ────────────────────────────────────────────────────────
+
+function shutdown() {
+  for (const child of activeProcesses) {
+    child.kill('SIGTERM');
+  }
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 process.stderr.write("[HomeKit Automator MCP] Server started\n");

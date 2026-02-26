@@ -24,6 +24,15 @@ import Logging
 struct AutomationRegistry {
     private let configDirPath: URL
 
+    /// Reference-type cache so reads can update it without requiring `mutating` on the struct.
+    private let cache = Cache()
+
+    /// Internal cache for in-memory automation data. Using a reference type allows
+    /// non-mutating struct methods to update the cache transparently.
+    private final class Cache {
+        var automations: [RegisteredAutomation]?
+    }
+
     init(configDir: URL? = nil) {
         self.configDirPath = configDir ?? FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config")
@@ -51,18 +60,29 @@ struct AutomationRegistry {
 
     // MARK: - CRUD
 
+    /// Reads automations directly from disk, bypassing the cache.
+    /// Used inside locked write operations to ensure fresh data.
+    private func loadFromDisk() throws -> [RegisteredAutomation] {
+        guard FileManager.default.fileExists(atPath: registryPath.path) else {
+            return []
+        }
+        let data = try Data(contentsOf: registryPath)
+        return try JSONDecoder().decode([RegisteredAutomation].self, from: data)
+    }
+
     /// Loads all registered automations from the registry file.
+    ///
+    /// Returns a cached result if available; otherwise reads from disk and populates the cache.
     ///
     /// - Returns: An array of all registered automations. Returns an empty array if the
     ///   registry file does not exist (normal on first run).
     /// - Throws: `DecodingError` if the JSON is malformed or does not match the expected
     ///   schema; `FileManager` errors if file access fails.
     func loadAll() throws -> [RegisteredAutomation] {
-        guard FileManager.default.fileExists(atPath: registryPath.path) else {
-            return []
-        }
-        let data = try Data(contentsOf: registryPath)
-        return try JSONDecoder().decode([RegisteredAutomation].self, from: data)
+        if let cached = cache.automations { return cached }
+        let result = try loadFromDisk()
+        cache.automations = result
+        return result
     }
 
     /// Finds a registered automation by ID or name (case-insensitive name matching).
@@ -79,58 +99,81 @@ struct AutomationRegistry {
 
     /// Saves a new automation to the registry.
     ///
+    /// Acquires an advisory file lock to prevent concurrent CLI processes from clobbering
+    /// the registry. Reads fresh data from disk under the lock, appends the new automation,
+    /// writes atomically, and updates the in-memory cache.
+    ///
     /// - Parameter automation: The automation to register. Must have a unique ID; no duplicate
     ///   checking is performed here.
-    /// - Throws: `DecodingError` if the existing registry is malformed; `EncodingError` if the
+    /// - Throws: `RegistryError.lockFailed` if the file lock cannot be acquired;
+    ///   `RegistryError.duplicateName` if an automation with the same name exists;
+    ///   `DecodingError` if the existing registry is malformed; `EncodingError` if the
     ///   new automation cannot be encoded; `FileManager` errors if directory creation or file
     ///   write fails.
     func save(_ automation: RegisteredAutomation) throws {
-        var all = try loadAll()
-        if all.contains(where: { $0.name.lowercased() == automation.name.lowercased() }) {
-            Log.automation.warning("Duplicate name rejected", metadata: ["name": "\(automation.name)"])
-            throw RegistryError.duplicateName(automation.name)
+        try withFileLock {
+            var all = try loadFromDisk()
+            if all.contains(where: { $0.name.lowercased() == automation.name.lowercased() }) {
+                Log.automation.warning("Duplicate name rejected", metadata: ["name": "\(automation.name)"])
+                throw RegistryError.duplicateName(automation.name)
+            }
+            all.append(automation)
+            try persist(all)
+            cache.automations = all
+            Log.automation.info("Automation saved", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
         }
-        all.append(automation)
-        try persist(all)
-        Log.automation.info("Automation saved", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
     }
 
     /// Updates an existing automation in the registry.
     ///
+    /// Acquires an advisory file lock, reads fresh data, applies the update, writes atomically,
+    /// and updates the in-memory cache.
+    ///
     /// - Parameter automation: The updated automation with the same ID as the one to replace.
-    /// - Throws: `RegistryError.notFound` if no automation with the given ID exists;
+    /// - Throws: `RegistryError.lockFailed` if the file lock cannot be acquired;
+    ///   `RegistryError.notFound` if no automation with the given ID exists;
     ///   `DecodingError` if the existing registry is malformed; `EncodingError` if the
     ///   updated automation cannot be encoded; `FileManager` errors if file write fails.
     func update(_ automation: RegisteredAutomation) throws {
-        var all = try loadAll()
-        guard let index = all.firstIndex(where: { $0.id == automation.id }) else {
-            Log.automation.warning("Update target not found", metadata: ["id": "\(automation.id)"])
-            throw RegistryError.notFound(automation.id)
+        try withFileLock {
+            var all = try loadFromDisk()
+            guard let index = all.firstIndex(where: { $0.id == automation.id }) else {
+                Log.automation.warning("Update target not found", metadata: ["id": "\(automation.id)"])
+                throw RegistryError.notFound(automation.id)
+            }
+            if all.contains(where: { $0.id != automation.id && $0.name.lowercased() == automation.name.lowercased() }) {
+                Log.automation.warning("Duplicate name rejected on update", metadata: ["name": "\(automation.name)"])
+                throw RegistryError.duplicateName(automation.name)
+            }
+            all[index] = automation
+            try persist(all)
+            cache.automations = all
+            Log.automation.info("Automation updated", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
         }
-        if all.contains(where: { $0.id != automation.id && $0.name.lowercased() == automation.name.lowercased() }) {
-            Log.automation.warning("Duplicate name rejected on update", metadata: ["name": "\(automation.name)"])
-            throw RegistryError.duplicateName(automation.name)
-        }
-        all[index] = automation
-        try persist(all)
-        Log.automation.info("Automation updated", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
     }
 
     /// Deletes an automation from the registry by ID.
     ///
-    /// - Parameter id: The unique ID of the automation to delete. Silently succeeds if no
-    ///   matching automation exists.
-    /// - Throws: `DecodingError` if the existing registry is malformed; `EncodingError` if the
+    /// Acquires an advisory file lock, reads fresh data, removes the entry, writes atomically,
+    /// and updates the in-memory cache.
+    ///
+    /// - Parameter id: The unique ID of the automation to delete.
+    /// - Throws: `RegistryError.lockFailed` if the file lock cannot be acquired;
+    ///   `RegistryError.notFound` if no automation with the given ID exists;
+    ///   `DecodingError` if the existing registry is malformed; `EncodingError` if the
     ///   updated registry cannot be encoded; `FileManager` errors if file write fails.
     func delete(_ id: String) throws {
-        var all = try loadAll()
-        guard all.contains(where: { $0.id == id }) else {
-            Log.automation.warning("Delete target not found", metadata: ["id": "\(id)"])
-            throw RegistryError.notFound(id)
+        try withFileLock {
+            var all = try loadFromDisk()
+            guard all.contains(where: { $0.id == id }) else {
+                Log.automation.warning("Delete target not found", metadata: ["id": "\(id)"])
+                throw RegistryError.notFound(id)
+            }
+            all.removeAll { $0.id == id }
+            try persist(all)
+            cache.automations = all
+            Log.automation.info("Automation deleted", metadata: ["id": "\(id)"])
         }
-        all.removeAll { $0.id == id }
-        try persist(all)
-        Log.automation.info("Automation deleted", metadata: ["id": "\(id)"])
     }
 
     // MARK: - Persistence
@@ -141,6 +184,31 @@ struct AutomationRegistry {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(automations)
         try data.write(to: registryPath, options: .atomic)
+    }
+
+    // MARK: - File Locking
+
+    /// Executes a closure while holding an advisory file lock on the registry directory.
+    ///
+    /// Uses POSIX `flock(2)` with `LOCK_EX` (exclusive lock) to serialize concurrent CLI
+    /// processes that may attempt simultaneous registry writes. The lock file is created
+    /// at `~/.config/homekit-automator/.lock`.
+    ///
+    /// - Parameter body: The closure to execute under the lock.
+    /// - Returns: The value returned by `body`.
+    /// - Throws: `RegistryError.lockFailed` if the lock file cannot be created or locked;
+    ///   rethrows any error from `body`.
+    private func withFileLock<T>(_ body: () throws -> T) throws -> T {
+        _ = try ensureConfigDir()
+        let lockURL = configDirPath.appendingPathComponent(".lock")
+        let fd = open(lockURL.path, O_CREAT | O_RDWR, 0o600)
+        guard fd >= 0 else { throw RegistryError.lockFailed }
+        defer {
+            flock(fd, LOCK_UN)
+            close(fd)
+        }
+        guard flock(fd, LOCK_EX) == 0 else { throw RegistryError.lockFailed }
+        return try body()
     }
 
     // MARK: - Logging
@@ -223,10 +291,14 @@ enum RegistryError: LocalizedError {
     /// An automation with the given name already exists in the registry.
     case duplicateName(String)
 
+    /// Failed to acquire the advisory file lock for registry writes.
+    case lockFailed
+
     var errorDescription: String? {
         switch self {
         case .notFound(let id): return "Automation not found: \(id)"
         case .duplicateName(let name): return "An automation named '\(name)' already exists"
+        case .lockFailed: return "Failed to acquire registry file lock"
         }
     }
 }

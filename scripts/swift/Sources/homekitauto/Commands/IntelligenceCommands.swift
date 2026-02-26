@@ -334,6 +334,23 @@ struct Energy: AsyncParsableCommand {
             "switch": 60.0
         ]
 
+        // Build device name → category lookup from device map for energy estimates
+        var deviceCategories: [String: String] = [:]
+        if let homes = deviceMap?.dictionaryValue?["homes"]?.arrayValue {
+            for home in homes {
+                guard let rooms = home.dictionaryValue?["rooms"]?.arrayValue else { continue }
+                for room in rooms {
+                    guard let accessories = room.dictionaryValue?["accessories"]?.arrayValue else { continue }
+                    for accessory in accessories {
+                        if let name = accessory.dictionaryValue?["name"]?.stringValue,
+                           let cat = accessory.dictionaryValue?["category"]?.stringValue {
+                            deviceCategories[name] = cat
+                        }
+                    }
+                }
+            }
+        }
+
         var deviceEstimates: [[String: AnyCodableValue]] = []
         // Estimate energy from automations that control power on devices
         for auto in automations where energyRelatedNames.contains(auto.name) {
@@ -341,8 +358,8 @@ struct Energy: AsyncParsableCommand {
             for action in auto.actions {
                 if action.characteristic == "power" && action.value.boolValue == true {
                     // Estimate: device runs for ~1 hour per automation trigger
-                    let category = action.room ?? "unknown"
-                    let watts = deviceTypeWatts.first { _ in true }?.value ?? 10.0
+                    let category = deviceCategories[action.deviceName] ?? "unknown"
+                    let watts = deviceTypeWatts[category] ?? 10.0
                     let estimatedWh = watts * Double(runsForAuto) // 1 hour per run
                     deviceEstimates.append([
                         "device": .string(action.deviceName),

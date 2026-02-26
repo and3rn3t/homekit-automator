@@ -24,6 +24,8 @@ let package = Package(
     products: [
         // The CLI binary that users and the MCP server invoke
         .executable(name: "homekitauto", targets: ["homekitauto"]),
+        // Shared library containing canonical model types and AnyCodableValue
+        .library(name: "HomeKitCore", targets: ["HomeKitCore"]),
     ],
     dependencies: [
         // CLI framework: provides @Argument, @Option, @Flag, and subcommand routing
@@ -32,12 +34,21 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     ],
     targets: [
+        // Shared library — canonical AnyCodableValue and model types used by all targets.
+        // HomeKitHelper and HomeKitAutomator (Xcode targets) mirror these sources;
+        // the CLI and test targets import this module directly.
+        .target(
+            name: "HomeKitCore",
+            path: "Sources/HomeKitCore"
+        ),
+
         // CLI tool — the user-facing command-line interface.
-        // Communicates with HomeKitHelper via Unix domain socket at /tmp/homekitauto.sock.
+        // Communicates with HomeKitHelper via Unix domain socket in Application Support directory.
         // Source files are in Sources/homekitauto/ (main.swift, Commands/, Models, etc.)
         .executableTarget(
             name: "homekitauto",
             dependencies: [
+                "HomeKitCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Logging", package: "swift-log"),
             ],
@@ -65,7 +76,7 @@ let package = Package(
         // Run with: swift test
         .testTarget(
             name: "HomeKitAutomatorTests",
-            dependencies: ["homekitauto"],
+            dependencies: ["homekitauto", "HomeKitCore"],
             path: "Tests/HomeKitAutomatorTests"
         ),
     ]

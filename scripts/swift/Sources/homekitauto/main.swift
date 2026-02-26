@@ -2,7 +2,7 @@
 // Entry point for the `homekitauto` command-line tool.
 //
 // This is the user-facing CLI that communicates with the HomeKitHelper process
-// via a Unix domain socket at /tmp/homekitauto.sock. It uses Swift Argument
+// via a Unix domain socket in ~/Library/Application Support/homekit-automator/. It uses Swift Argument
 // Parser to provide a rich subcommand interface with built-in help text.
 //
 // The CLI is also invoked programmatically by the MCP server (scripts/mcp-server/index.js)
@@ -39,7 +39,7 @@ struct HomeKitAuto: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "homekitauto",
         abstract: "Control Apple HomeKit devices and manage automations from the command line.",
-        version: "1.0.0",
+        version: "1.1.0",
         subcommands: [
             Status.self,         // Bridge connectivity check
             Discover.self,       // Full home/room/device/scene discovery
@@ -58,7 +58,7 @@ struct HomeKitAuto: AsyncParsableCommand {
 
     mutating func run() async throws {
         Log.configure(verbose: verbose)
-        Log.main.info("HomeKit Automator CLI starting", metadata: ["version": "1.0.0"])
+        Log.main.info("HomeKit Automator CLI starting", metadata: ["version": "1.1.0"])
         // Default subcommand (Status) is handled by ArgumentParser
         let status = Status()
         try await status.run()

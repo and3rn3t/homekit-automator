@@ -1,9 +1,10 @@
 // Models.swift
-// Local copies of the core data models used by the HomeKit Automator GUI.
+// HomeKitAutomator — This file should match HomeKitCore/Models.swift and
+// HomeKitCore/AnyCodableValue.swift — do not edit independently.
 //
-// These types mirror the models in the homekitauto CLI target. They are copied here
-// rather than imported because the CLI target is built via SPM while this app is built
-// via Xcode/XcodeGen, and they cannot share a target directly.
+// This is a copy of the canonical models from Sources/HomeKitCore/.
+// HomeKitAutomator is built via Xcode/XcodeGen and cannot import the SPM HomeKitCore
+// module directly. Keep this file in sync with the canonical versions.
 
 import Foundation
 
@@ -92,6 +93,9 @@ struct AutomationAction: Codable {
     let delaySeconds: Int
     let sceneName: String?
     let sceneUuid: String?
+
+    /// Convenience accessor for the value in its Codable form.
+    var codableValue: AnyCodableValue { value }
 }
 
 // MARK: - Log Entry
@@ -129,14 +133,103 @@ struct AutomationLogEntry: Codable, Identifiable {
 // MARK: - AnyCodableValue
 
 /// A type-erased Codable value supporting JSON primitives.
-enum AnyCodableValue: Codable, Equatable, Sendable {
+/// This should match the canonical version in HomeKitCore/AnyCodableValue.swift.
+enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
     case string(String)
     case int(Int)
     case double(Double)
     case bool(Bool)
-    case null
     case array([AnyCodableValue])
     case dictionary([String: AnyCodableValue])
+    case null
+
+    // MARK: - CustomStringConvertible
+
+    var description: String {
+        switch self {
+        case .string(let s): return s
+        case .int(let i): return "\(i)"
+        case .double(let d): return "\(d)"
+        case .bool(let b): return "\(b)"
+        case .array(let a): return "\(a)"
+        case .dictionary(let d): return "\(d)"
+        case .null: return "null"
+        }
+    }
+
+    // MARK: - Display String
+
+    /// Returns a human-readable string representation of the value.
+    var displayString: String {
+        switch self {
+        case .string(let val): return val
+        case .int(let val): return "\(val)"
+        case .double(let val): return String(format: "%.1f", val)
+        case .bool(let val): return val ? "true" : "false"
+        case .null: return "null"
+        case .array(let val): return "[\(val.map(\.displayString).joined(separator: ", "))]"
+        case .dictionary(let val): return val.map { "\($0.key): \($0.value.displayString)" }.joined(separator: ", ")
+        }
+    }
+
+    // MARK: - Typed Accessors
+
+    /// Extracts the string value, or returns nil if this value is not a string.
+    var stringValue: String? {
+        if case .string(let s) = self { return s }
+        return nil
+    }
+
+    /// Extracts the integer value, or returns nil if this value is not an integer.
+    var intValue: Int? {
+        if case .int(let i) = self { return i }
+        return nil
+    }
+
+    /// Extracts the double value, or returns nil if this value is not numeric.
+    var doubleValue: Double? {
+        switch self {
+        case .double(let d): return d
+        case .int(let i): return Double(i)
+        default: return nil
+        }
+    }
+
+    /// Extracts the boolean value, or returns nil if this value is not a boolean.
+    var boolValue: Bool? {
+        if case .bool(let b) = self { return b }
+        return nil
+    }
+
+    /// Extracts the array value, or returns nil if this value is not an array.
+    var arrayValue: [AnyCodableValue]? {
+        if case .array(let a) = self { return a }
+        return nil
+    }
+
+    /// Extracts the dictionary value, or returns nil if this value is not a dictionary.
+    var dictionaryValue: [String: AnyCodableValue]? {
+        if case .dictionary(let d) = self { return d }
+        return nil
+    }
+
+    // MARK: - Raw Value
+
+    /// Extracts the underlying Swift value (not AnyCodableValue).
+    /// Useful for passing to HomeKit characteristic writers that expect Any type.
+    var rawValue: Any {
+        switch self {
+        case .string(let s): return s
+        case .int(let i): return i
+        case .double(let d): return d
+        case .bool(let b): return b
+        case .array(let a): return a.map { $0.rawValue }
+        case .dictionary(let d): return d.mapValues { $0.rawValue }
+        case .null: return NSNull()
+        }
+    }
+
+    // MARK: - Codable
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -155,9 +248,9 @@ enum AnyCodableValue: Codable, Equatable, Sendable {
         } else if let val = try? container.decode([String: AnyCodableValue].self) {
             self = .dictionary(val)
         } else {
-            throw DecodingError.typeMismatch(
-                AnyCodableValue.self,
-                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unsupported type")
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Cannot decode AnyCodableValue"
             )
         }
     }
@@ -172,19 +265,6 @@ enum AnyCodableValue: Codable, Equatable, Sendable {
         case .null: try container.encodeNil()
         case .array(let val): try container.encode(val)
         case .dictionary(let val): try container.encode(val)
-        }
-    }
-
-    /// Returns a human-readable string representation of the value.
-    var displayString: String {
-        switch self {
-        case .string(let val): return val
-        case .int(let val): return "\(val)"
-        case .double(let val): return String(format: "%.1f", val)
-        case .bool(let val): return val ? "true" : "false"
-        case .null: return "null"
-        case .array(let val): return "[\(val.map(\.displayString).joined(separator: ", "))]"
-        case .dictionary(let val): return val.map { "\($0.key): \($0.value.displayString)" }.joined(separator: ", ")
         }
     }
 }

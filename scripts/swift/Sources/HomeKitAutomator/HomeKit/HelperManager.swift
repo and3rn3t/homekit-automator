@@ -38,8 +38,13 @@ final class HelperManager {
     /// Sliding window duration for restart limiting (15 minutes).
     private let restartWindowDuration: TimeInterval = 15 * 60
 
-    /// Socket path used for health-check pings.
-    var socketPath: String = "/tmp/homekitauto.sock"
+    /// Socket path used for health-check pings (defaults to Application Support directory).
+    var socketPath: String = {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("homekit-automator")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("homekitauto.sock").path
+    }()
 
     // MARK: - Internal State
 
@@ -162,10 +167,25 @@ final class HelperManager {
 
     /// Sends a simple command to the helper via Unix domain socket and returns the raw
     /// JSON response string.
+    /// Read the shared authentication token (must match SocketConstants.getOrCreateToken()).
+    private nonisolated static func readAuthToken() -> String {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let tokenPath = appSupport.appendingPathComponent("homekit-automator/.auth_token").path
+        if let existing = try? String(contentsOfFile: tokenPath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+           !existing.isEmpty {
+            return existing
+        }
+        let token = UUID().uuidString
+        try? token.write(toFile: tokenPath, atomically: true, encoding: .utf8)
+        chmod(tokenPath, 0o600)
+        return token
+    }
+
     private nonisolated func sendSocketCommand(_ command: String) async throws -> String {
         let requestId = UUID().uuidString
+        let token = Self.readAuthToken()
         let json = """
-        {"id":"\(requestId)","command":"\(command)"}
+        {"id":"\(requestId)","command":"\(command)","token":"\(token)"}
         """
 
         return try await withCheckedThrowingContinuation { continuation in

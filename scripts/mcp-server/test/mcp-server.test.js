@@ -170,7 +170,7 @@ describe("MCP Server Integration Tests", () => {
     assert.equal(response.result.protocolVersion, "2024-11-05");
     assert.deepStrictEqual(response.result.capabilities, { tools: {} });
     assert.equal(response.result.serverInfo.name, "homekit-automator");
-    assert.equal(response.result.serverInfo.version, "1.0.0");
+    assert.equal(response.result.serverInfo.version, "1.1.0");
 
     // Send the initialized notification (no response expected)
     await client.sendNotification("notifications/initialized");

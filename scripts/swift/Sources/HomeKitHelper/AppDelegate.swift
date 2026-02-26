@@ -10,7 +10,7 @@
 /// PROCESS LIFECYCLE:
 /// 1. App launches, AppDelegate initializes HomeKitManager (which creates HMHomeManager)
 /// 2. HMHomeManager asynchronously loads home data from iCloud; HomeKitManager.waitForReady() waits for this
-/// 3. HelperSocketServer starts listening on /tmp/homekitauto.sock for JSON-NL commands
+/// 3. HelperSocketServer starts listening on ~/Library/Application Support/homekit-automator/homekitauto.sock for JSON-NL commands
 /// 4. CLI tool connects to socket and sends commands (get_device, set_device, discover, etc.)
 /// 5. On shutdown command or termination, socket server stops and app exits
 
@@ -22,7 +22,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     /// Unix domain socket server that accepts commands from the CLI tool.
     var socketServer: HelperSocketServer?
     /// Manager for HomeKit home and accessory control; must run on main thread (@MainActor).
-    var homeKitManager: HomeKitManager?
+    private(set) lazy var homeKitManager = HomeKitManager()
 
     /// Application initialization entry point.
     /// Initializes HomeKitManager and starts the Unix socket server.
@@ -30,14 +30,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        // Initialize HomeKit manager
-        homeKitManager = HomeKitManager()
-
         // Start the Unix socket server
-        socketServer = HelperSocketServer(homeKitManager: homeKitManager!)
+        socketServer = HelperSocketServer(homeKitManager: homeKitManager)
         socketServer?.start()
 
-        print("[HomeKitHelper] Started. Listening on /tmp/homekitauto.sock")
+        print("[HomeKitHelper] Started. Listening on socket.")
         return true
     }
 

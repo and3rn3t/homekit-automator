@@ -8,7 +8,7 @@ import Logging
 ///
 /// This actor encapsulates the IPC (inter-process communication) layer that enables the CLI (`homekitauto`
 /// command) to communicate with the `HomeKitHelper` background process. The architecture follows a simple
-/// request-response pattern over a Unix domain socket at `/tmp/homekitauto.sock`.
+/// request-response pattern over a Unix domain socket in the Application Support directory.
 ///
 /// **IPC Architecture:**
 /// The communication flow is: CLI Command → SocketClient → Unix Socket → HomeKitHelper
@@ -24,8 +24,39 @@ import Logging
 /// This type is an `actor`, which provides exclusive access to socket operations and ensures thread-safe
 /// mutation. Since socket I/O is inherently serial and stateful, the actor model prevents concurrent calls
 /// from interleaving socket operations (create → connect → send → receive), which would corrupt the protocol.
+/// Shared socket configuration constants
+public enum SocketConstants {
+    /// Default socket path in user-scoped Application Support directory
+    public static var defaultPath: String {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("homekit-automator")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("homekitauto.sock").path
+    }
+
+    /// Path to the authentication token file
+    public static var tokenPath: String {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupport.appendingPathComponent("homekit-automator/.auth_token").path
+    }
+
+    /// Generate or read the shared authentication token
+    public static func getOrCreateToken() -> String {
+        let path = tokenPath
+        if let existing = try? String(contentsOfFile: path, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+           !existing.isEmpty {
+            return existing
+        }
+        let token = UUID().uuidString
+        try? token.write(toFile: path, atomically: true, encoding: .utf8)
+        // Set file permissions to owner-only (0600)
+        chmod(path, 0o600)
+        return token
+    }
+}
+
 actor SocketClient {
-    static let socketPath = "/tmp/homekitauto.sock"
+    static let socketPath = SocketConstants.defaultPath
     private let timeout: TimeInterval = 10.0
 
     /// Request message sent to the HomeKitHelper.
@@ -42,6 +73,9 @@ actor SocketClient {
 
         /// Optional command-specific parameters, with heterogeneous values (strings, ints, bools, etc.).
         let params: [String: AnyCodableValue]?
+
+        /// Authentication token for verifying the client is authorized.
+        let token: String?
     }
 
     /// Response message received from the HomeKitHelper.
@@ -72,7 +106,7 @@ actor SocketClient {
     /// 1. **Create**: Generates a unique request ID and builds a `Request` struct.
     /// 2. **Encode**: JSON-encodes the request and appends a newline delimiter.
     /// 3. **Socket Creation**: Creates a Unix domain socket (AF_UNIX, SOCK_STREAM).
-    /// 4. **Connect**: Connects to the HomeKitHelper listening at `/tmp/homekitauto.sock`.
+    /// 4. **Connect**: Connects to the HomeKitHelper listening at the Application Support socket path.
     /// 5. **Send**: Transmits the JSON-NL encoded request in one or more calls to `send()`.
     /// 6. **Receive**: Reads the response in a loop with a 10-second timeout, accumulating data until
     ///    a newline delimiter is encountered.
@@ -93,8 +127,15 @@ actor SocketClient {
     ///   - `DecodingError` if the response JSON cannot be decoded.
     func send(command: String, params: [String: AnyCodableValue]? = nil) async throws -> Response {
         let requestId = UUID().uuidString
+        let token = SocketConstants.getOrCreateToken()
         Log.socket.debug("Preparing request", metadata: ["command": "\(command)", "requestId": "\(requestId)"])
-        let request = Request(id: requestId, command: command, params: params)
+
+        // Warn if legacy socket path still exists
+        if FileManager.default.fileExists(atPath: "/tmp/homekitauto.sock") {
+            Log.socket.warning("Legacy socket found at /tmp/homekitauto.sock — please remove it. Socket has moved to \(Self.socketPath)")
+        }
+
+        let request = Request(id: requestId, command: command, params: params, token: token)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = []

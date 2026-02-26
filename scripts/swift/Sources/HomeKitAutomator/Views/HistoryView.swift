@@ -167,8 +167,10 @@ struct HistoryView: View {
 
     // MARK: - Filtered & Sorted
 
+    private static let isoFormatter = ISO8601DateFormatter()
+
     private var filteredEntries: [AutomationLogEntry] {
-        let isoFormatter = ISO8601DateFormatter()
+        let isoFormatter = Self.isoFormatter
 
         var result = store.logEntries
 

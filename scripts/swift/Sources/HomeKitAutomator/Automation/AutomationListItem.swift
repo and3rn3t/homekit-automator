@@ -118,12 +118,15 @@ struct AutomationListItem: View {
         lastLogEntry != nil
     }
 
-    private func formattedDate(_ iso8601: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        guard let date = formatter.date(from: iso8601) else { return iso8601 }
+    private static let isoFormatter = ISO8601DateFormatter()
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter
+    }()
 
-        let relative = RelativeDateTimeFormatter()
-        relative.unitsStyle = .abbreviated
-        return relative.localizedString(for: date, relativeTo: Date())
+    private func formattedDate(_ iso8601: String) -> String {
+        guard let date = Self.isoFormatter.date(from: iso8601) else { return iso8601 }
+        return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 }
