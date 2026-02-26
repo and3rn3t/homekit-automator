@@ -22,13 +22,13 @@ including every controllable and readable characteristic.
 **Category name:** `light`
 **HomeKit type:** `HMAccessoryCategoryTypeLightbulb`
 
-| Characteristic | Type | Range | Writable | Description |
-|---------------|------|-------|----------|-------------|
-| `power` | Boolean | true/false | Yes | Turn light on or off |
-| `brightness` | Integer | 0–100 | Yes | Brightness percentage |
-| `hue` | Float | 0–360 | Yes | Color hue in degrees (0=red, 120=green, 240=blue) |
-| `saturation` | Float | 0–100 | Yes | Color saturation percentage (0=white, 100=fully saturated) |
-| `colorTemperature` | Integer | 140–500 | Yes | Color temperature in mireds (140=cool/blue, 500=warm/yellow) |
+| Characteristic | Type | Range | Writable | Validation |
+|---------------|------|-------|----------|------------|
+| `power` | Boolean | true/false | Yes | — |
+| `brightness` | Integer | 0–100 | Yes | Values outside 0–100 are rejected |
+| `hue` | Float | 0–360 | Yes | Values outside 0–360 are rejected |
+| `saturation` | Float | 0–100 | Yes | Values outside 0–100 are rejected |
+| `colorTemperature` | Integer | 140–500 | Yes | Values outside 140–500 are rejected |
 
 **Notes:**
 - Not all lights support all characteristics. A basic on/off bulb may only have `power`.
@@ -51,18 +51,18 @@ homekitauto set "Living Room Strip" saturation 100     # Fully saturated
 **Category name:** `thermostat`
 **HomeKit type:** `HMAccessoryCategoryTypeThermostat`
 
-| Characteristic | Type | Range | Writable | Description |
-|---------------|------|-------|----------|-------------|
-| `targetTemperature` | Float | 10–38 (°C) or 50–100 (°F) | Yes | Desired temperature |
-| `currentTemperature` | Float | — | **No** | Current ambient temperature reading |
-| `hvacMode` | Integer | 0–3 | Yes | 0=off, 1=heat, 2=cool, 3=auto |
-| `currentHeatingCoolingState` | Integer | — | **No** | 0=off, 1=heating, 2=cooling |
-| `targetHumidity` | Float | 0–100 | Yes | Desired relative humidity (if supported) |
-| `currentHumidity` | Float | — | **No** | Current relative humidity reading |
+| Characteristic | Type | Range | Writable | Validation |
+|---------------|------|-------|----------|------------|
+| `targetTemperature` | Float | 10–38 (°C) / 50–100 (°F) | Yes | Converted via `--units`; values outside range rejected |
+| `currentTemperature` | Float | — | **No (read-only)** | Cannot be set — use `targetTemperature` instead |
+| `hvacMode` | Integer | 0–3 | Yes | 0=off, 1=heat, 2=cool, 3=auto; string aliases accepted |
+| `currentHeatingCoolingState` | Integer | — | **No (read-only)** | Reports current HVAC state; cannot be set |
+| `targetHumidity` | Float | 0–100 | Yes | Values outside 0–100 are rejected |
+| `currentHumidity` | Float | — | **No (read-only)** | Reports current humidity; cannot be set |
 
 **Notes:**
-- Temperature ranges vary by device and region. The HomeKit API reports values in Celsius. The skill converts to Fahrenheit based on the user's locale.
-- `currentTemperature` and `currentHeatingCoolingState` are read-only sensor readings.
+- Temperature ranges vary by device and region. The HomeKit API reports values in Celsius. The skill converts to Fahrenheit when `--units fahrenheit` is specified or based on the user's locale.
+- `currentTemperature` and `currentHeatingCoolingState` are **read-only** sensor readings. Attempting to set them triggers a validation error suggesting the writable alternative.
 - Not all thermostats support humidity control. Check the device's characteristics.
 - `hvacMode` accepts string aliases: "off", "heat", "cool", "auto".
 
@@ -85,6 +85,7 @@ homekitauto get "Thermostat"    # Shows both current and target temps
 
 **Notes:**
 - `lockState` is the target (what you want). `currentLockState` is the actual state (what it is now).
+- `currentLockState` is **read-only** — attempting to set it triggers a validation error suggesting `lockState` instead.
 - A jammed state (2) means the lock motor couldn't complete the operation.
 - String aliases accepted: "locked"/"unlocked" or "on"/"off" or "true"/"false".
 
@@ -100,11 +101,11 @@ homekitauto get "Front Door Lock"    # Shows current and target state
 **Category name:** `door`
 **HomeKit type:** `HMAccessoryCategoryTypeDoor`
 
-| Characteristic | Type | Range | Writable | Description |
-|---------------|------|-------|----------|-------------|
-| `targetPosition` | Integer | 0–100 | Yes | Target position (0=closed, 100=open) |
-| `currentPosition` | Integer | — | **No** | Current position |
-| `positionState` | Integer | — | **No** | 0=going to minimum, 1=going to maximum, 2=stopped |
+| Characteristic | Type | Range | Writable | Validation |
+|---------------|------|-------|----------|------------|
+| `targetPosition` | Integer | 0–100 | Yes | 0=closed, 100=open; values outside range rejected |
+| `currentPosition` | Integer | — | **No (read-only)** | Reports actual position; cannot be set |
+| `positionState` | Integer | — | **No (read-only)** | 0=going to minimum, 1=going to maximum, 2=stopped |
 
 **Common commands:**
 ```
@@ -117,14 +118,15 @@ homekitauto set "Front Door" targetPosition 100   # Open
 **Category name:** `garageDoor`
 **HomeKit type:** `HMAccessoryCategoryTypeGarageDoorOpener`
 
-| Characteristic | Type | Range | Writable | Description |
-|---------------|------|-------|----------|-------------|
+| Characteristic | Type | Range | Writable | Validation |
+|---------------|------|-------|----------|------------|
 | `targetPosition` | Integer | 0/1 | Yes | 0=open, 1=closed (note: reversed from doors) |
-| `currentPosition` | Integer | — | **No** | 0=open, 1=closed, 2=opening, 3=closing, 4=stopped |
-| `obstructionDetected` | Boolean | — | **No** | Whether something is blocking the door |
+| `currentPosition` | Integer | — | **No (read-only)** | 0=open, 1=closed, 2=opening, 3=closing, 4=stopped |
+| `obstructionDetected` | Boolean | — | **No (read-only)** | Whether something is blocking the door |
 
 **Notes:**
 - Garage door state values are reversed from regular doors (0=open, 1=closed).
+- `currentPosition` and `obstructionDetected` are **read-only** — they report status only.
 - String aliases: "open"/"closed".
 - Always check `obstructionDetected` before closing.
 
@@ -140,10 +142,10 @@ homekitauto get "Garage Door"    # Shows current state + obstruction
 **Category name:** `fan`
 **HomeKit type:** `HMAccessoryCategoryTypeFan`
 
-| Characteristic | Type | Range | Writable | Description |
-|---------------|------|-------|----------|-------------|
-| `active` | Boolean | true/false | Yes | Turn fan on or off |
-| `rotationSpeed` | Float | 0–100 | Yes | Fan speed percentage |
+| Characteristic | Type | Range | Writable | Validation |
+|---------------|------|-------|----------|------------|
+| `active` | Boolean | true/false | Yes | — |
+| `rotationSpeed` | Float | 0–100 | Yes | Values outside 0–100 are rejected |
 | `rotationDirection` | Integer | 0/1 | Yes | 0=clockwise, 1=counter-clockwise |
 | `swingMode` | Integer | 0/1 | Yes | 0=disabled, 1=enabled (oscillation) |
 
@@ -159,11 +161,11 @@ homekitauto set "Bedroom Fan" swingMode 1    # Enable oscillation
 **Category name:** `windowCovering`
 **HomeKit type:** `HMAccessoryCategoryTypeWindowCovering`
 
-| Characteristic | Type | Range | Writable | Description |
-|---------------|------|-------|----------|-------------|
-| `targetPosition` | Integer | 0–100 | Yes | Target position (0=closed/down, 100=open/up) |
-| `currentPosition` | Integer | — | **No** | Current position |
-| `positionState` | Integer | — | **No** | 0=decreasing, 1=increasing, 2=stopped |
+| Characteristic | Type | Range | Writable | Validation |
+|---------------|------|-------|----------|------------|
+| `targetPosition` | Integer | 0–100 | Yes | 0=closed/down, 100=open/up; values outside range rejected |
+| `currentPosition` | Integer | — | **No (read-only)** | Current position; cannot be set |
+| `positionState` | Integer | — | **No (read-only)** | 0=decreasing, 1=increasing, 2=stopped |
 
 **Notes:**
 - The meaning of 0 and 100 depends on the specific blind/shade. For most: 0=fully closed, 100=fully open.
@@ -197,7 +199,7 @@ homekitauto set "Coffee Maker Switch" power on
 | Characteristic | Type | Range | Writable | Description |
 |---------------|------|-------|----------|-------------|
 | `power` | Boolean | true/false | Yes | Outlet on or off |
-| `outletInUse` | Boolean | — | **No** | Whether something is drawing power |
+| `outletInUse` | Boolean | — | **No (read-only)** | Whether something is drawing power |
 
 **Common commands:**
 ```

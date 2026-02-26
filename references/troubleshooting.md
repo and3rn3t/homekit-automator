@@ -8,10 +8,13 @@ Common issues and their solutions, organized by symptom.
 2. [HomeKit Access Issues](#homekit-access-issues)
 3. [Device Issues](#device-issues)
 4. [Automation Issues](#automation-issues)
-5. [Shortcut Issues](#shortcut-issues)
-6. [MCP Server Issues](#mcp-server-issues)
-7. [Build Issues](#build-issues)
-8. [Diagnostic Commands](#diagnostic-commands)
+5. [Validation Errors](#validation-errors)
+6. [Condition Evaluation Issues](#condition-evaluation-issues)
+7. [Shortcut Issues](#shortcut-issues)
+8. [MCP Server Issues](#mcp-server-issues)
+9. [Build Issues](#build-issues)
+10. [Logging and Diagnostics](#logging-and-diagnostics)
+11. [Diagnostic Commands](#diagnostic-commands)
 
 ## Connection Issues
 
@@ -96,7 +99,7 @@ echo '{"id":"test","command":"status"}' | nc -U /tmp/homekitauto.sock
 
 1. **Check the exact name.** Device names are case-sensitive. Run `homekitauto discover` to see the exact names.
 
-2. **Fuzzy matching.** The tool attempts a fuzzy match (substring, case-insensitive) but it's not perfect. Try using the device UUID instead:
+2. **Fuzzy matching.** The tool uses Levenshtein distance for fuzzy matching. If a close match is found, it will suggest the correct name (e.g., "Did you mean 'Bedroom Light'?"). Try the suggested name or use the device UUID instead:
    ```bash
    homekitauto discover --json | grep -A2 "your device"
    # Find the uuid field and use that
@@ -166,6 +169,93 @@ homekitauto get "Device Name" --json
 ```bash
 homekitauto automation delete --name "Morning Routine"
 ```
+
+## Validation Errors
+
+The validation pipeline runs during `automation_create` and `automation_edit`. Here are the
+common validation failures and how to fix them:
+
+### "Device not found: 'Bedroom Lamp'. Did you mean 'Bedroom Light'?"
+
+**Cause:** The device name doesn't match any device in the current home. The engine used
+Levenshtein distance to find a close match.
+
+**Fix:** Use the suggested device name, or run `homekitauto discover` to see exact device names.
+If you have multiple homes, make sure you're targeting the right home with `--home`.
+
+### "Characteristic 'brightness' is not supported by 'Front Door Lock'"
+
+**Cause:** The device doesn't have the requested characteristic. A lock doesn't support brightness.
+
+**Fix:** Check available characteristics with `homekitauto get "Device Name" --json` and use
+one that's listed. See `references/device-categories.md` for the full reference.
+
+### "Characteristic 'currentTemperature' is read-only. Use 'targetTemperature' instead."
+
+**Cause:** You tried to set a read-only characteristic. Read-only characteristics report
+sensor data and cannot be controlled.
+
+**Fix:** Use the writable equivalent. Common read-only → writable mappings:
+- `currentTemperature` → `targetTemperature`
+- `currentLockState` → `lockState`
+- `currentPosition` → `targetPosition`
+- `currentHeatingCoolingState` → `hvacMode`
+
+### "Value 150 is out of range for 'brightness' (0–100)"
+
+**Cause:** The numeric value exceeds the device's reported min/max range.
+
+**Fix:** Use a value within the valid range. The error message includes the accepted range.
+Common ranges:
+- brightness: 0–100
+- hue: 0–360
+- saturation: 0–100
+- colorTemperature: 140–500
+- targetTemperature: 10–38°C / 50–100°F
+- rotationSpeed: 0–100
+- targetPosition: 0–100
+
+### "Invalid cron expression '60 7 * * *'. Minute must be 0–59."
+
+**Cause:** The cron expression has an invalid field value.
+
+**Fix:** Ensure all cron fields are within valid ranges:
+- Minute: 0–59
+- Hour: 0–23
+- Day of month: 1–31
+- Month: 1–12
+- Day of week: 0–6 (0=Sunday)
+
+## Condition Evaluation Issues
+
+### Conditions Always Fail During Test
+
+**Symptom:** `automation_test` reports conditions failed even though you expect them to pass.
+
+**Causes:**
+
+1. **Device state is stale.** The condition queries live device state. If the device isn't
+   responding, the query may return an unexpected value. Check with `homekitauto get "Device"`.
+
+2. **Temperature unit mismatch.** If the condition uses Fahrenheit but the device reports
+   Celsius (or vice versa), the comparison may fail. Use `--units` to ensure consistency.
+
+3. **Time zone issue.** Time-based conditions use the system time zone. If your automation
+   specifies a different timezone in the trigger, the condition may evaluate differently.
+
+**Fix:** Run `automation_test` with `LOG_LEVEL=debug` to see detailed condition evaluation:
+```bash
+LOG_LEVEL=debug homekitauto automation test --name "Morning Routine"
+```
+This shows the current value, expected value, operator, and result for each condition.
+
+### Conditions Are Skipped During Ad-Hoc Test
+
+**Symptom:** You pass raw `actions` to `automation_test` and conditions are not checked.
+
+**Explanation:** This is expected. When testing with raw actions (no saved automation),
+there are no conditions to evaluate. Conditions are only checked when testing a saved
+automation by `--name` or `--id`.
 
 ## Shortcut Issues
 
@@ -268,6 +358,51 @@ The Catalyst helper requires the HomeKit entitlement in its code signature. This
 1. Open the generated Xcode project: `open scripts/swift/Sources/HomeKitHelper/HomeKitHelper.xcodeproj`
 2. Select the target → Signing & Capabilities → Add "HomeKit"
 3. Rebuild
+
+## Logging and Diagnostics
+
+### Enabling Verbose Logging
+
+The CLI uses [swift-log](https://github.com/apple/swift-log) for structured logging. To
+enable verbose output for troubleshooting:
+
+```bash
+# Set log level via environment variable
+LOG_LEVEL=debug homekitauto status
+
+# Even more detail
+LOG_LEVEL=trace homekitauto discover
+```
+
+### Log Levels
+
+| Level | What it shows |
+|-------|---------------|
+| `critical` | Socket connection failure, helper crash |
+| `error` | Command failures, validation rejections |
+| `warning` | Recoverable errors, device unreachable, deprecated flags |
+| `info` | Command execution, automation lifecycle events (default) |
+| `debug` | Validation steps, condition evaluation details, device matching |
+| `trace` | Socket message payloads, raw HomeKit characteristic values |
+
+### Interpreting Log Output
+
+Logs are written to stderr, so they don't interfere with JSON output on stdout:
+
+```bash
+# Capture logs to a file while still getting normal output
+homekitauto discover --json 2>/tmp/homekit-debug.log
+
+# View logs
+cat /tmp/homekit-debug.log
+```
+
+### Common Log Patterns
+
+- `[debug] Validation: checking device 'Kitchen Lights'...` — Validation pipeline details
+- `[debug] ConditionEvaluator: deviceState currentTemperature = 73, operator: lessThan, target: 70 -> FAIL` — Condition evaluation
+- `[warning] Deprecated: --json flag is deprecated, use --definition instead` — Deprecated flag usage
+- `[error] Device 'Bedroom Lamp' not found. Closest match: 'Bedroom Light' (distance: 2)` — Fuzzy match failure
 
 ## Diagnostic Commands
 

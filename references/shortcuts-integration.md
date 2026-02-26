@@ -41,8 +41,20 @@ from user-created Shortcuts.
 
 ### Step 3: Import via Shortcuts CLI or URL Scheme
 
+Before importing, the engine checks whether a Shortcut with the same name already exists
+using `shortcuts list | grep`. If a Shortcut with the same `HKA:` name is found:
+- During **create**: the import is skipped and the existing Shortcut is reused
+- During **edit**: the old Shortcut is deleted first, then the updated version is imported
+- During **delete**: the Shortcut is removed via `shortcuts delete`
+
+This prevents duplicate Shortcuts from accumulating when automations are recreated.
+
 **Method 1: shortcuts CLI** (preferred, macOS 12+)
 ```bash
+# Check existence first
+shortcuts list | grep -q "^HKA: Morning Routine$" && echo "exists" || echo "not found"
+
+# Import (only if not already present, or after deleting old version)
 shortcuts import "HKA: Morning Routine" < ~/.config/homekit-automator/shortcuts/HKA_Morning_Routine.shortcut
 ```
 
@@ -211,3 +223,6 @@ device-independent once registered.
    are hard to express in the plist format. Keep conditions simple.
 5. **Device state triggers** — These can't be done via Shortcuts alone. They require the
    HomeKit Automator app to be running and monitoring device state via the helper.
+6. **Overwrite behavior** — The `shortcuts` CLI does not natively support overwriting an
+   existing Shortcut. The engine must delete-then-import to update. There is a brief window
+   during which the old Shortcut is gone and the new one isn't yet imported.

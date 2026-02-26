@@ -74,7 +74,18 @@ Then register it:
 
 ## Building from Source
 
-### Clone and Configure
+### Option A: Install via Homebrew (Recommended)
+
+The simplest way to install the CLI tool:
+
+```bash
+brew install homekit-automator/tap/homekit-automator
+```
+
+This installs the `homekitauto` CLI to your PATH. You still need to build or download the
+HomeKit Automator.app separately for the HomeKit bridge component (see Option B below).
+
+### Option B: Clone and Build
 
 ```bash
 # Clone the repository

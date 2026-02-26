@@ -1,5 +1,7 @@
 # HomeKit Automator
 
+[![CI](https://github.com/homekit-automator/homekit-automator/actions/workflows/ci.yml/badge.svg)](https://github.com/homekit-automator/homekit-automator/actions/workflows/ci.yml)
+
 A comprehensive Apple HomeKit smart home automation skill for [OpenClaw](https://openclaw.ai) and Claude. Control devices, create complex automations via natural conversation, and register them as native Apple Shortcuts so they run reliably on schedule — even when the AI agent isn't active.
 
 ## What It Does
@@ -12,15 +14,23 @@ The skill parses your intent, validates it against your actual devices, generate
 
 ## Key Features
 
-**Device Control** — Turn lights on/off, adjust brightness and color, set thermostats, lock/unlock doors, trigger scenes, and more. Supports all standard HomeKit accessory categories: lights, thermostats, locks, doors, garage doors, fans, window coverings, switches, outlets, and sensors.
+**Device Control** — Turn lights on/off, adjust brightness and color, set thermostats, lock/unlock doors, trigger scenes, and more. Supports all standard HomeKit accessory categories: lights, thermostats, locks, doors, garage doors, fans, window coverings, switches, outlets, and sensors. Temperature values support F↔C conversion with `--units celsius|fahrenheit`.
 
-**Automation Builder** — Create time-based, solar-based (sunrise/sunset), and manual automations through conversation. Supports conditions ("only on weekdays," "if the temperature is below 70"), delays between actions, and multi-device orchestration.
+**Automation Builder** — Create time-based, solar-based (sunrise/sunset), and manual automations through conversation. Supports conditions ("only on weekdays," "if the temperature is below 70"), delays between actions, and multi-device orchestration. Full validation pipeline catches errors before registration: device existence (with fuzzy name matching), characteristic support, writability checks, value ranges, and cron parsing.
 
-**Apple Shortcuts Integration** — Every automation is registered as a native Apple Shortcut prefixed with `HKA:`. This means automations survive app closure, sync across devices, and leverage Apple's proven scheduling infrastructure.
+**Apple Shortcuts Integration** — Every automation is registered as a native Apple Shortcut prefixed with `HKA:`. Includes existence checking before import to prevent duplicates. Automations survive app closure, sync across devices, and leverage Apple's proven scheduling infrastructure.
 
-**Home Intelligence** — Analyzes your device setup and existing automations to suggest useful routines you haven't created yet. Provides energy insights about which devices are active and how often automations fire.
+**Home Intelligence** — Analyzes your device setup and existing automations to suggest useful routines you haven't created yet, with seasonal awareness and pattern-based detection of repeated manual commands. Provides energy insights with week-over-week history and per-device usage trends.
+
+**Multi-Home Support** — All commands accept a `--home` flag for users with multiple HomeKit homes (e.g., "Main House" and "Beach House").
+
+**Condition Evaluation** — `automation_test` evaluates conditions against live device state before executing actions, so you can verify your automation logic works correctly.
 
 **Full CLI** — The `homekitauto` command-line tool provides direct access to all capabilities without needing an AI agent. Useful for scripting, debugging, and manual control.
+
+**Menu Bar App** — Native SwiftUI menu bar app with dashboard, settings, and history views for managing automations and monitoring helper process health.
+
+**Tested & CI** — 50 Swift unit tests, 14 MCP integration tests, 24 eval cases. GitHub Actions CI/CD pipeline for automated builds and tests.
 
 ## Architecture Overview
 
@@ -160,6 +170,7 @@ homekitauto get "Kitchen Lights"      # Get device state
 homekitauto set "Kitchen Lights" power on           # Turn on
 homekitauto set "Kitchen Lights" brightness 60      # Set brightness
 homekitauto set "Thermostat" targetTemperature 72   # Set temperature
+homekitauto set "Thermostat" targetTemperature 22 --units celsius  # Set in Celsius
 homekitauto set "Front Door" lockState locked       # Lock door
 
 # Rooms and scenes
@@ -168,23 +179,29 @@ homekitauto scenes                    # List all scenes
 homekitauto trigger "Good Morning"    # Trigger a scene
 
 # Automation management
-homekitauto automation list                        # List all automations
-homekitauto automation create --file routine.json  # Create from file
-homekitauto automation test --name "Bedtime"       # Dry-run an automation
-homekitauto automation delete --name "Bedtime"     # Delete an automation
+homekitauto automation list                           # List all automations
+homekitauto automation create --file routine.json     # Create from file
+homekitauto automation create --definition '{...}'    # Create from inline JSON
+homekitauto automation test --name "Bedtime"          # Dry-run (evaluates conditions)
+homekitauto automation delete --name "Bedtime"        # Delete an automation
 
 # Intelligence
 homekitauto suggest                   # Get automation suggestions
 homekitauto suggest --focus security  # Focus on security suggestions
 homekitauto energy                    # Energy and usage insights
 homekitauto energy --period month     # Monthly energy summary
+homekitauto energy --history          # Week-over-week comparison
+
+# Multi-home
+homekitauto discover --home "Beach House"   # Discover devices in specific home
+homekitauto set "Porch Lights" power on --home "Beach House"
 
 # Configuration
 homekitauto config                    # Show current config
 homekitauto config --default-home "Beach House"    # Switch active home
 ```
 
-All commands support `--json` for machine-readable output.
+All commands support `--json` for machine-readable output. Use `--home "Name"` to target a specific home.
 
 ## MCP Tools
 
@@ -200,9 +217,9 @@ The MCP server exposes 10 tools for AI agents. See [references/mcp-tools.md](ref
 | `automation_list` | List all registered automations |
 | `automation_edit` | Modify an existing automation |
 | `automation_delete` | Remove an automation and its Shortcut |
-| `automation_test` | Dry-run an automation immediately |
-| `home_suggest` | Get intelligent automation suggestions |
-| `energy_summary` | Device usage and automation activity insights |
+| `automation_test` | Dry-run an automation (evaluates conditions first) |
+| `home_suggest` | Get intelligent automation suggestions (seasonal + pattern-based) |
+| `energy_summary` | Device usage, automation activity, and week-over-week history |
 
 ## Project Structure
 
@@ -238,8 +255,11 @@ homekit-automator/
 │   │   │   │   ├── AnyCodableValue.swift
 │   │   │   │   ├── Models.swift
 │   │   │   │   ├── AutomationRegistry.swift
+│   │   │   │   ├── AutomationValidator.swift
+│   │   │   │   ├── ConditionEvaluator.swift
 │   │   │   │   ├── ShortcutGenerator.swift
 │   │   │   │   ├── HomeAnalyzer.swift
+│   │   │   │   ├── Logger.swift
 │   │   │   │   └── Commands/
 │   │   │   │       ├── StatusCommand.swift
 │   │   │   │       ├── DiscoverCommand.swift
@@ -258,7 +278,11 @@ homekit-automator/
 │   │   │
 │   │   └── Tests/
 │   │       └── HomeKitAutomatorTests/
-│   │           └── AutomationRegistryTests.swift
+│   │           ├── AutomationRegistryTests.swift
+│   │           ├── AutomationRegistryCRUDTests.swift
+│   │           ├── HomeAnalyzerTests.swift
+│   │           ├── ShortcutGeneratorTests.swift
+│   │           └── ValidationTests.swift
 │   │
 │   ├── mcp-server/                   # Node.js MCP server
 │   │   ├── package.json
@@ -301,6 +325,22 @@ Configuration is stored at `~/.config/homekit-automator/`:
 - **macOS only**: HomeKit requires a Mac with iCloud sign-in. The skill cannot run on Linux or Windows.
 - **Development signing**: Apple restricts HomeKit access to development-signed or App Store builds. Each Mac must be registered with your Apple Developer account.
 - **Device state triggers require app running**: Schedule and manual triggers work via Apple Shortcuts (app can be closed). Device state triggers (e.g., "when the door opens") require the HomeKit Automator app to be running to monitor state changes.
+
+## Testing
+
+The project includes comprehensive test coverage:
+
+- **50 Swift unit tests** — Validation pipeline, registry CRUD, shortcut generation, home analysis
+- **14 MCP integration tests** — Server protocol, tool invocation, error handling
+- **24 evaluation test cases** — Skill quality measurement for natural language parsing
+
+```bash
+# Run Swift tests
+cd scripts/swift && swift test
+
+# Run MCP server tests
+cd scripts/mcp-server && npm test
+```
 
 ## Contributing
 

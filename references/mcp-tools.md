@@ -8,7 +8,10 @@ The HomeKit Automator MCP server exposes 10 tools via stdio transport.
 
 Returns a complete map of the user's HomeKit setup. Call this first in every new conversation.
 
-**Parameters:** none
+**Parameters:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `home` | string | no | Target a specific home by name (defaults to primary home) |
 
 **Returns:**
 ```json
@@ -56,6 +59,8 @@ Query the current state of one or more devices.
 |-------|------|----------|-------------|
 | `device` | string | yes* | Device name or UUID |
 | `room` | string | yes* | Room name (returns all devices in room) |
+| `home` | string | no | Target a specific home by name |
+| `units` | string | no | Temperature unit: `celsius` or `fahrenheit` (default: system locale) |
 
 *Provide either `device` or `room`, not both.
 
@@ -88,6 +93,8 @@ Send an immediate command to a device.
 | `device` | string | yes | Device name or UUID |
 | `characteristic` | string | yes | What to change (power, brightness, targetTemperature, etc.) |
 | `value` | any | yes | Target value (true/false, number, string) |
+| `home` | string | no | Target a specific home by name |
+| `units` | string | no | Temperature unit: `celsius` or `fahrenheit` (for temperature values) |
 
 **Supported characteristics by category:**
 
@@ -120,6 +127,7 @@ Activate an Apple Home scene.
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `scene` | string | yes | Scene name or UUID |
+| `home` | string | no | Target a specific home by name |
 
 **Returns:**
 ```json
@@ -136,6 +144,11 @@ Activate an Apple Home scene.
 
 Create a new automation and register it as an Apple Shortcut.
 
+The automation definition is passed via the `--definition` flag (inline JSON) or `--file`
+(path to a JSON file). The engine runs a full validation pipeline before accepting:
+device existence (with Levenshtein fuzzy match), characteristic support, writability,
+value ranges, cron parsing, and duplicate name check.
+
 **Parameters:**
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -144,6 +157,7 @@ Create a new automation and register it as an Apple Shortcut.
 | `conditions` | array | no | Optional guards |
 | `actions` | array | yes | Ordered list of device actions |
 | `enabled` | bool | no | Default: true |
+| `home` | string | no | Target a specific home by name |
 
 See `references/automation-schema.md` for the full trigger, condition, and action schemas.
 
@@ -167,6 +181,7 @@ List all automations managed by this skill.
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `filter` | string | no | Filter by: "enabled", "disabled", "schedule", "manual" |
+| `home` | string | no | Target a specific home by name |
 
 **Returns:**
 ```json
@@ -190,7 +205,8 @@ List all automations managed by this skill.
 
 ### automation_edit
 
-Modify an existing automation.
+Modify an existing automation. The edit fully decodes and applies new actions, triggers,
+and conditions — not just metadata fields.
 
 **Parameters:**
 | Param | Type | Required | Description |
@@ -198,6 +214,7 @@ Modify an existing automation.
 | `id` | string | yes* | Automation UUID |
 | `name` | string | yes* | Automation name (alternative to id) |
 | `changes` | object | yes | Partial automation object with fields to update |
+| `home` | string | no | Target a specific home by name |
 
 *Provide either `id` or `name`.
 
@@ -212,6 +229,7 @@ Remove an automation and its Apple Shortcut.
 |-------|------|----------|-------------|
 | `id` | string | yes* | Automation UUID |
 | `name` | string | yes* | Automation name |
+| `home` | string | no | Target a specific home by name |
 
 **Returns:**
 ```json
@@ -226,19 +244,28 @@ Remove an automation and its Apple Shortcut.
 
 Dry-run an automation — execute all its actions immediately without scheduling.
 
+When testing a saved automation, the engine first evaluates all conditions against live
+device state. If any condition is not met, actions are skipped and the result shows which
+conditions failed. When testing with raw `actions`, conditions are not evaluated.
+
 **Parameters:**
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | yes* | Automation UUID |
 | `name` | string | yes* | Automation name |
 | `actions` | array | yes* | Or provide raw actions to test without a saved automation |
+| `home` | string | no | Target a specific home by name |
 
 *Provide `id`/`name` for an existing automation, or `actions` for ad-hoc testing.
 
-**Returns:**
+**Returns (conditions pass):**
 ```json
 {
   "tested": "Morning Routine",
+  "conditionResults": [
+    { "type": "deviceState", "description": "Thermostat currentTemperature < 70", "passed": true }
+  ],
+  "conditionsPassed": true,
   "results": [
     { "device": "Kitchen Lights", "action": "power -> true", "success": true },
     { "device": "Thermostat", "action": "targetTemperature -> 72", "success": true },
@@ -250,16 +277,33 @@ Dry-run an automation — execute all its actions immediately without scheduling
 }
 ```
 
+**Returns (conditions fail):**
+```json
+{
+  "tested": "Morning Routine",
+  "conditionResults": [
+    { "type": "deviceState", "description": "Thermostat currentTemperature < 70", "currentValue": 73, "passed": false }
+  ],
+  "conditionsPassed": false,
+  "actionsSkipped": true,
+  "message": "1 of 1 conditions failed. Actions were not executed."
+}
+```
+
 ## Intelligence
 
 ### home_suggest
 
 Analyze the user's home setup and suggest useful automations they haven't created yet.
+The suggestion engine includes seasonal awareness (e.g., heating suggestions in winter,
+cooling in summer) and pattern-based analysis (detecting repeated manual commands that
+could be automated).
 
 **Parameters:**
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `focus` | string | no | Narrow suggestions: "energy", "security", "comfort", "convenience" |
+| `home` | string | no | Target a specific home by name |
 
 **Returns:**
 ```json
@@ -291,6 +335,8 @@ Provide insights about device usage and automation patterns.
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `period` | string | no | "today", "week", "month" (default: "week") |
+| `history` | boolean | no | Include week-over-week comparison data for trend analysis |
+| `home` | string | no | Target a specific home by name |
 
 **Returns:**
 ```json
@@ -302,6 +348,16 @@ Provide insights about device usage and automation patterns.
   "insights": [
     "The hallway lights have been on for 6 hours — they might have been left on accidentally",
     "Your thermostat has been in heating mode continuously since Tuesday — consider an eco schedule"
-  ]
+  ],
+  "history": {
+    "currentWeek": { "totalOnTimeHours": 142, "automationRuns": 14 },
+    "previousWeek": { "totalOnTimeHours": 128, "automationRuns": 12 },
+    "trend": "up",
+    "delta": "+10.9%",
+    "deviceDeltas": [
+      { "device": "Thermostat", "change": "+23%", "note": "Consider lowering target temp" },
+      { "device": "Kitchen Lights", "change": "-5%", "note": "Usage decreased" }
+    ]
+  }
 }
 ```
