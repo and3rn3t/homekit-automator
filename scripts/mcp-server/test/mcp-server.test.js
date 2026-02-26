@@ -500,4 +500,124 @@ describe("MCP Server Integration Tests", () => {
       "Error should mention the missing parameters",
     );
   });
+
+  // ── Argument Validation ──
+
+  it("test_device_control_missing_device", async () => {
+    const response = await client.send("tools/call", {
+      name: "device_control",
+      arguments: { characteristic: "power", value: true },
+    });
+    assert.ok(
+      response.result.isError,
+      "device_control without 'device' should return isError",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("Missing required parameter"),
+      "Error should mention missing required parameter",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("device"),
+      "Error should mention 'device'",
+    );
+  });
+
+  it("test_device_control_missing_characteristic", async () => {
+    const response = await client.send("tools/call", {
+      name: "device_control",
+      arguments: { device: "Kitchen Light", value: true },
+    });
+    assert.ok(
+      response.result.isError,
+      "device_control without 'characteristic' should return isError",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("characteristic"),
+      "Error should mention 'characteristic'",
+    );
+  });
+
+  it("test_device_control_missing_value", async () => {
+    const response = await client.send("tools/call", {
+      name: "device_control",
+      arguments: { device: "Kitchen Light", characteristic: "power" },
+    });
+    assert.ok(
+      response.result.isError,
+      "device_control without 'value' should return isError",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("value"),
+      "Error should mention 'value'",
+    );
+  });
+
+  it("test_scene_trigger_missing_scene", async () => {
+    const response = await client.send("tools/call", {
+      name: "scene_trigger",
+      arguments: {},
+    });
+    assert.ok(
+      response.result.isError,
+      "scene_trigger without 'scene' should return isError",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("scene"),
+      "Error should mention 'scene'",
+    );
+  });
+
+  it("test_automation_create_missing_name", async () => {
+    const response = await client.send("tools/call", {
+      name: "automation_create",
+      arguments: {
+        trigger: { type: "manual", humanReadable: "manual" },
+        actions: [{ deviceName: "Light", characteristic: "power", value: true }],
+      },
+    });
+    assert.ok(
+      response.result.isError,
+      "automation_create without 'name' should return isError",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("name"),
+      "Error should mention 'name'",
+    );
+  });
+
+  it("test_automation_create_missing_actions", async () => {
+    const response = await client.send("tools/call", {
+      name: "automation_create",
+      arguments: {
+        name: "Test",
+        trigger: { type: "manual", humanReadable: "manual" },
+      },
+    });
+    assert.ok(
+      response.result.isError,
+      "automation_create without 'actions' should return isError",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("actions"),
+      "Error should mention 'actions'",
+    );
+  });
+
+  it("test_automation_create_missing_trigger", async () => {
+    const response = await client.send("tools/call", {
+      name: "automation_create",
+      arguments: {
+        name: "Test",
+        actions: [{ deviceName: "Light", characteristic: "power", value: true }],
+      },
+    });
+    assert.ok(
+      response.result.isError,
+      "automation_create without 'trigger' should return isError",
+    );
+    assert.ok(
+      response.result.content[0].text.includes("trigger"),
+      "Error should mention 'trigger'",
+    );
+  });
 });

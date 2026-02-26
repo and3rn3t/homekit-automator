@@ -24,36 +24,8 @@ import Logging
 /// This type is an `actor`, which provides exclusive access to socket operations and ensures thread-safe
 /// mutation. Since socket I/O is inherently serial and stateful, the actor model prevents concurrent calls
 /// from interleaving socket operations (create → connect → send → receive), which would corrupt the protocol.
-/// Shared socket configuration constants
-public enum SocketConstants {
-    /// Default socket path in user-scoped Application Support directory
-    public static var defaultPath: String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("homekit-automator")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("homekitauto.sock").path
-    }
 
-    /// Path to the authentication token file
-    public static var tokenPath: String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("homekit-automator/.auth_token").path
-    }
-
-    /// Generate or read the shared authentication token
-    public static func getOrCreateToken() -> String {
-        let path = tokenPath
-        if let existing = try? String(contentsOfFile: path, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-           !existing.isEmpty {
-            return existing
-        }
-        let token = UUID().uuidString
-        try? token.write(toFile: path, atomically: true, encoding: .utf8)
-        // Set file permissions to owner-only (0600)
-        chmod(path, 0o600)
-        return token
-    }
-}
+import HomeKitCore
 
 actor SocketClient {
     static let socketPath = SocketConstants.defaultPath
@@ -76,6 +48,9 @@ actor SocketClient {
 
         /// Authentication token for verifying the client is authorized.
         let token: String?
+
+        /// Protocol version for forward-compatibility detection.
+        let version: Int?
     }
 
     /// Response message received from the HomeKitHelper.
@@ -131,11 +106,12 @@ actor SocketClient {
         Log.socket.debug("Preparing request", metadata: ["command": "\(command)", "requestId": "\(requestId)"])
 
         // Warn if legacy socket path still exists
-        if FileManager.default.fileExists(atPath: "/tmp/homekitauto.sock") {
-            Log.socket.warning("Legacy socket found at /tmp/homekitauto.sock — please remove it. Socket has moved to \(Self.socketPath)")
+        if FileManager.default.fileExists(atPath: SocketConstants.legacySocketPath) {
+            Log.socket.warning("Legacy socket found at \(SocketConstants.legacySocketPath) — please remove it. Socket has moved to \(Self.socketPath)")
         }
 
-        let request = Request(id: requestId, command: command, params: params, token: token)
+        let request = Request(id: requestId, command: command, params: params, token: token,
+                              version: SocketConstants.protocolVersion)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = []

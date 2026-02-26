@@ -334,4 +334,177 @@ final class ShortcutGeneratorTests: XCTestCase {
         )
         XCTAssertTrue(automation.shortcutName.hasPrefix("HKA: "))
     }
+
+    // MARK: - Edge Cases
+
+    func testStringValueInHomeKitSetAction() throws {
+        let actions = [
+            AutomationAction(
+                deviceUuid: "uuid-str",
+                deviceName: "Thermostat",
+                characteristic: "hvacMode",
+                value: .string("heat"),
+                delaySeconds: 0
+            )
+        ]
+
+        let path = outputPath("string-value")
+        try generator.generate(name: "String Value", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+
+        // Comment + 1 device action = 2
+        XCTAssertEqual(wfActions.count, 2)
+
+        let params = wfActions[1]["WFWorkflowActionParameters"] as! [String: Any]
+        XCTAssertEqual(params["WFHomeValue"] as? String, "heat")
+    }
+
+    func testNullValueFallsBackToStringRepresentation() throws {
+        let actions = [
+            AutomationAction(
+                deviceUuid: "uuid-null",
+                deviceName: "Device",
+                characteristic: "power",
+                value: .null,
+                delaySeconds: 0
+            )
+        ]
+
+        let path = outputPath("null-value")
+        try generator.generate(name: "Null Value", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+        let params = wfActions[1]["WFWorkflowActionParameters"] as! [String: Any]
+        XCTAssertNotNil(params["WFHomeValue"], "Null value should still produce a WFHomeValue entry")
+    }
+
+    func testArrayValueFallsBackToStringRepresentation() throws {
+        let actions = [
+            AutomationAction(
+                deviceUuid: "uuid-arr",
+                deviceName: "Device",
+                characteristic: "custom",
+                value: .array([.int(1), .int(2)]),
+                delaySeconds: 0
+            )
+        ]
+
+        let path = outputPath("array-value")
+        try generator.generate(name: "Array Value", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+        let params = wfActions[1]["WFWorkflowActionParameters"] as! [String: Any]
+        XCTAssertNotNil(params["WFHomeValue"])
+        // Default case produces a string representation
+        XCTAssertTrue(params["WFHomeValue"] is String)
+    }
+
+    func testEmptyActionsProducesOnlyComment() throws {
+        let actions: [AutomationAction] = []
+
+        let path = outputPath("empty-actions")
+        try generator.generate(name: "Empty", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+
+        // Only the comment action
+        XCTAssertEqual(wfActions.count, 1)
+        XCTAssertEqual(
+            wfActions[0]["WFWorkflowActionIdentifier"] as? String,
+            "is.workflow.actions.comment"
+        )
+    }
+
+    func testSceneActionWithMissingUuidIsSkipped() throws {
+        let actions = [
+            AutomationAction(
+                type: "scene",
+                deviceUuid: "",
+                deviceName: "",
+                characteristic: "",
+                value: .null,
+                delaySeconds: 0,
+                sceneName: "Living Room",
+                sceneUuid: nil
+            )
+        ]
+
+        let path = outputPath("scene-no-uuid")
+        try generator.generate(name: "No UUID", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+
+        // Only the comment action; scene action should be skipped
+        XCTAssertEqual(wfActions.count, 1)
+    }
+
+    func testSceneActionWithMissingNameIsSkipped() throws {
+        let actions = [
+            AutomationAction(
+                type: "scene",
+                deviceUuid: "",
+                deviceName: "",
+                characteristic: "",
+                value: .null,
+                delaySeconds: 0,
+                sceneName: nil,
+                sceneUuid: "scene-123"
+            )
+        ]
+
+        let path = outputPath("scene-no-name")
+        try generator.generate(name: "No Name", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+
+        // Only the comment action; scene action should be skipped
+        XCTAssertEqual(wfActions.count, 1)
+    }
+
+    func testDoubleValueInHomeKitSetAction() throws {
+        let actions = [
+            AutomationAction(
+                deviceUuid: "uuid-dbl",
+                deviceName: "Thermostat",
+                characteristic: "targetTemperature",
+                value: .double(22.5),
+                delaySeconds: 0
+            )
+        ]
+
+        let path = outputPath("double-value")
+        try generator.generate(name: "Double Value", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+        let params = wfActions[1]["WFWorkflowActionParameters"] as! [String: Any]
+        XCTAssertEqual(params["WFHomeValue"] as! Double, 22.5, accuracy: 0.01)
+    }
+
+    func testIntValueInHomeKitSetAction() throws {
+        let actions = [
+            AutomationAction(
+                deviceUuid: "uuid-int",
+                deviceName: "Light",
+                characteristic: "brightness",
+                value: .int(75),
+                delaySeconds: 0
+            )
+        ]
+
+        let path = outputPath("int-value")
+        try generator.generate(name: "Int Value", actions: actions, outputPath: path)
+
+        let plist = try parsePlist(at: path)
+        let wfActions = workflowActions(from: plist)
+        let params = wfActions[1]["WFWorkflowActionParameters"] as! [String: Any]
+        XCTAssertEqual(params["WFHomeValue"] as? Int, 75)
+    }
 }

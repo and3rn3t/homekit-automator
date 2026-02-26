@@ -263,7 +263,7 @@ struct Energy: AsyncParsableCommand {
     ///   - automations: All registered automations for cross-referencing device types.
     ///   - deviceMap: Current device map for device category lookup.
     /// - Returns: Dictionary with historical energy analysis data.
-    private func generateEnergyHistory(
+    func generateEnergyHistory(
         log: [AutomationLogEntry],
         automations: [RegisteredAutomation],
         deviceMap: AnyCodableValue?

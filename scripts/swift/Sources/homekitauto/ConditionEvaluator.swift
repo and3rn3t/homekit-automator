@@ -300,6 +300,7 @@ struct ConditionEvaluator {
 
     /// Compares two AnyCodableValue instances using the specified operator.
     /// Supports numeric comparisons (int/double) and equality for bools/strings.
+    /// Returns false for numeric operators when values are non-numeric.
     private func compareValues(actual: AnyCodableValue, expected: AnyCodableValue, operator op: String) -> Bool {
         switch op {
         case "equals":
@@ -311,10 +312,10 @@ struct ConditionEvaluator {
         case "lessThan":
             return numericCompare(actual, expected) == .orderedAscending
         case "greaterOrEqual":
-            let result = numericCompare(actual, expected)
+            guard let result = numericCompare(actual, expected) else { return false }
             return result == .orderedDescending || result == .orderedSame
         case "lessOrEqual":
-            let result = numericCompare(actual, expected)
+            guard let result = numericCompare(actual, expected) else { return false }
             return result == .orderedAscending || result == .orderedSame
         default:
             return false
@@ -335,10 +336,10 @@ struct ConditionEvaluator {
     }
 
     /// Performs numeric comparison between two values, returning ComparisonResult.
-    /// Returns nil if neither value is numeric.
-    private func numericCompare(_ a: AnyCodableValue, _ b: AnyCodableValue) -> ComparisonResult {
+    /// Returns nil if either value is non-numeric (callers must handle the nil case).
+    private func numericCompare(_ a: AnyCodableValue, _ b: AnyCodableValue) -> ComparisonResult? {
         guard let aNum = a.doubleValue, let bNum = b.doubleValue else {
-            return .orderedSame
+            return nil
         }
         if aNum < bNum { return .orderedAscending }
         if aNum > bNum { return .orderedDescending }

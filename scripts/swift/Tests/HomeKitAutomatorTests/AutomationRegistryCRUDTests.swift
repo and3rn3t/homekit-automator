@@ -218,4 +218,210 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         XCTAssertEqual(entries[0].automationName, "Auto 5")
         XCTAssertEqual(entries[999].automationName, "Auto 1004")
     }
+
+    // MARK: - Concurrent Write Tests
+
+    func testConcurrentSavesDontLoseData() throws {
+        // Simulate concurrent saves from multiple dispatch queues
+        let saveCount = 20
+        let expectation = XCTestExpectation(description: "All concurrent saves complete")
+        expectation.expectedFulfillmentCount = saveCount
+
+        let queue = DispatchQueue(label: "concurrent-test", attributes: .concurrent)
+        let registry = self.registry!
+        let makeAutomation = { (i: Int) -> RegisteredAutomation in
+            self.makeSampleAutomation(id: "concurrent-\(i)", name: "Concurrent Auto \(i)")
+        }
+
+        for i in 0..<saveCount {
+            queue.async {
+                let automation = makeAutomation(i)
+                do {
+                    try registry.save(automation)
+                } catch {
+                    // Duplicate name errors are expected under concurrency — that's fine
+                    // Only unexpected errors should fail
+                    if case RegistryError.duplicateName = error {
+                        // Expected — concurrent saves may collide on names
+                    } else {
+                        XCTFail("Unexpected error on save \(i): \(error)")
+                    }
+                }
+                expectation.fulfill()
+            }
+        }
+
+        wait(for: [expectation], timeout: 10.0)
+
+        // At minimum, some saves should have succeeded and the file should be readable
+        let all = try registry.loadAll()
+        XCTAssertTrue(all.count > 0, "At least some concurrent saves should succeed")
+        XCTAssertTrue(all.count <= saveCount, "Should not exceed total save attempts")
+    }
+
+    func testRapidSaveDeleteCycle() throws {
+        // Save and delete rapidly to test file system state consistency
+        for i in 0..<10 {
+            let automation = makeSampleAutomation(id: "cycle-\(i)", name: "Cycle \(i)")
+            try registry.save(automation)
+            try registry.delete("cycle-\(i)")
+        }
+
+        let all = try registry.loadAll()
+        XCTAssertTrue(all.isEmpty, "All saved automations should be deleted")
+    }
+
+    func testUpdateNonExistent() throws {
+        let automation = makeSampleAutomation(id: "ghost", name: "Ghost")
+        XCTAssertThrowsError(try registry.update(automation)) { error in
+            guard case RegistryError.notFound(let id) = error else {
+                XCTFail("Expected RegistryError.notFound, got \(error)")
+                return
+            }
+            XCTAssertEqual(id, "ghost")
+        }
+    }
+
+    // MARK: - Log Period Filter Tests
+
+    func testLoadLogWeekFilter() throws {
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+
+        // Entry from 3 days ago (within week)
+        let recentEntry = AutomationLogEntry(
+            automationId: "auto-recent",
+            automationName: "Recent",
+            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -3, to: now)!),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        // Entry from 10 days ago (outside week)
+        let oldEntry = AutomationLogEntry(
+            automationId: "auto-old",
+            automationName: "Old",
+            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -10, to: now)!),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        try registry.appendLog(oldEntry)
+        try registry.appendLog(recentEntry)
+
+        let weekEntries = try registry.loadLog(period: "week")
+        XCTAssertEqual(weekEntries.count, 1)
+        XCTAssertEqual(weekEntries[0].automationName, "Recent")
+    }
+
+    func testLoadLogMonthFilter() throws {
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+
+        // Entry from 15 days ago (within month)
+        let withinMonth = AutomationLogEntry(
+            automationId: "auto-month",
+            automationName: "Within Month",
+            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -15, to: now)!),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        // Entry from 40 days ago (outside month)
+        let outsideMonth = AutomationLogEntry(
+            automationId: "auto-outside",
+            automationName: "Outside Month",
+            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -40, to: now)!),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        try registry.appendLog(outsideMonth)
+        try registry.appendLog(withinMonth)
+
+        let monthEntries = try registry.loadLog(period: "month")
+        XCTAssertEqual(monthEntries.count, 1)
+        XCTAssertEqual(monthEntries[0].automationName, "Within Month")
+
+        // loadLog with no filter should return both
+        let allEntries = try registry.loadLog()
+        XCTAssertEqual(allEntries.count, 2)
+    }
+
+    func testLoadLogTodayFilter() throws {
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+
+        // Entry from right now (today)
+        let todayEntry = AutomationLogEntry(
+            automationId: "auto-today",
+            automationName: "Today",
+            timestamp: formatter.string(from: now),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        // Entry from yesterday
+        let yesterdayEntry = AutomationLogEntry(
+            automationId: "auto-yesterday",
+            automationName: "Yesterday",
+            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -1, to: now)!),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        try registry.appendLog(yesterdayEntry)
+        try registry.appendLog(todayEntry)
+
+        let todayEntries = try registry.loadLog(period: "today")
+        XCTAssertEqual(todayEntries.count, 1)
+        XCTAssertEqual(todayEntries[0].automationName, "Today")
+    }
+
+    func testLoadLogUnknownPeriodDefaultsToWeek() throws {
+        let formatter = ISO8601DateFormatter()
+        let now = Date()
+
+        // Entry from 3 days ago (within week)
+        let recentEntry = AutomationLogEntry(
+            automationId: "auto-r",
+            automationName: "Recent",
+            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -3, to: now)!),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        // Entry from 10 days ago (outside week)
+        let oldEntry = AutomationLogEntry(
+            automationId: "auto-o",
+            automationName: "Old",
+            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -10, to: now)!),
+            actionsExecuted: 1,
+            succeeded: 1,
+            failed: 0,
+            errors: nil
+        )
+
+        try registry.appendLog(oldEntry)
+        try registry.appendLog(recentEntry)
+
+        // Unknown period string should default to week behavior
+        let entries = try registry.loadLog(period: "custom-unknown")
+        XCTAssertEqual(entries.count, 1, "Unknown period should default to week filter")
+        XCTAssertEqual(entries[0].automationName, "Recent")
+    }
 }

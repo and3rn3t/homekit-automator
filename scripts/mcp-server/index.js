@@ -32,7 +32,7 @@
  * as single-line JSON to stdout. Diagnostic messages go to stderr.
  */
 
-import { execFile } from "node:child_process"; // Spawns the CLI as a child process
+import { execFile, execFileSync } from "node:child_process"; // Spawns the CLI as a child process
 import { promisify } from "node:util";          // Converts callback-based execFile to async/await
 import { createInterface } from "node:readline"; // Reads stdin line-by-line for JSON-RPC messages
 import { readFileSync } from "node:fs";
@@ -536,6 +536,12 @@ async function handleMessage(message) {
 
   switch (method) {
     case "initialize":
+      // Validate CLI binary is available before reporting server capabilities
+      try {
+        execFileSync(CLI, ["--help"], { timeout: 5000, stdio: 'pipe' });
+      } catch {
+        process.stderr.write(`[HomeKit Automator MCP] WARNING: CLI binary '${CLI}' not found or not executable. Tool calls will fail.\n`);
+      }
       return {
         jsonrpc: "2.0",
         id,

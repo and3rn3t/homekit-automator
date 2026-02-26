@@ -63,7 +63,7 @@
 
 ### Unix Domain Socket Protocol
 
-Location: `/tmp/homekitauto.sock`
+Location: `~/Library/Application Support/homekit-automator/homekitauto.sock`
 Format: JSON messages delimited by newline (`\n`)
 
 **Request format:**
@@ -71,7 +71,9 @@ Format: JSON messages delimited by newline (`\n`)
 {
   "id": "uuid-string",
   "command": "command_name",
-  "params": { ... }
+  "params": { ... },
+  "token": "auth-token-string",
+  "version": 1
 }
 ```
 
@@ -181,7 +183,9 @@ manually unlocking a door) without polling.
 ## Configuration Storage
 
 ```
-~/.config/homekit-automator/
+~/Library/Application Support/homekit-automator/
+├── homekitauto.sock         # Unix domain socket for IPC
+├── .auth_token              # Shared authentication token (mode 0600)
 ├── config.json              # App settings (active home, filters, preferences)
 ├── automations.json         # Registry of created automations + Shortcut mappings
 ├── device-cache.json        # Last-known device map (refreshed on discover)
@@ -208,7 +212,8 @@ Logs are written to stderr by default. Set `LOG_LEVEL=debug` for verbose trouble
 ## Security Considerations
 
 - **HomeKit entitlement**: Only development-signed or App Store builds can access HomeKit
-- **Socket permissions**: `/tmp/homekitauto.sock` is user-owned, mode 0600
+- **Socket permissions**: `~/Library/Application Support/homekit-automator/homekitauto.sock` is user-owned, mode 0600
+- **Auth token**: Shared token at `~/Library/Application Support/homekit-automator/.auth_token`, mode 0600
 - **No cloud dependency**: All communication is local — no data leaves the machine
 - **iCloud sync**: HomeKit data syncs via iCloud; this app doesn't add any cloud endpoints
 - **Shortcut trust**: macOS may prompt user to trust each automation Shortcut on first install

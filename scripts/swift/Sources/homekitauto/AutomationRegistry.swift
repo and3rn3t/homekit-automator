@@ -11,32 +11,32 @@
 /// The registry does not employ internal locking.
 
 import Foundation
+import HomeKitCore
 import Logging
 
 /// Manages the persistent automation registry and logs for HomeKit automations.
 ///
 /// Directory Layout:
-/// - ~/.config/homekit-automator/automations.json — Registry of all registered automations
-/// - ~/.config/homekit-automator/logs/automation-log.json — Execution audit trail (up to 1000 entries)
+/// - ~/Library/Application Support/homekit-automator/automations.json — Registry of all registered automations
+/// - ~/Library/Application Support/homekit-automator/logs/automation-log.json — Execution audit trail (up to 1000 entries)
 ///
 /// All data is stored as JSON and persisted atomically to prevent corruption. Directories are
 /// created on demand if they do not exist.
-struct AutomationRegistry {
+///
+/// This is a reference type (class) because it manages file-backed state with an in-memory cache.
+/// Value semantics would cause confusing behavior: two copies would share the same cache object
+/// but could diverge on disk writes.
+final class AutomationRegistry {
     private let configDirPath: URL
 
-    /// Reference-type cache so reads can update it without requiring `mutating` on the struct.
-    private let cache = Cache()
-
-    /// Internal cache for in-memory automation data. Using a reference type allows
-    /// non-mutating struct methods to update the cache transparently.
-    private final class Cache {
-        var automations: [RegisteredAutomation]?
-    }
+    /// In-memory cache for loaded automation data. Avoids re-reading disk on every access.
+    private var cachedAutomations: [RegisteredAutomation]?
 
     init(configDir: URL? = nil) {
-        self.configDirPath = configDir ?? FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config")
-            .appendingPathComponent("homekit-automator")
+        self.configDirPath = configDir ?? SocketConstants.appSupportDir
+            ?? FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".config")
+                .appendingPathComponent("homekit-automator")
     }
 
     /// Ensures the config directory (~/.config/homekit-automator) exists, creating intermediate
@@ -79,9 +79,9 @@ struct AutomationRegistry {
     /// - Throws: `DecodingError` if the JSON is malformed or does not match the expected
     ///   schema; `FileManager` errors if file access fails.
     func loadAll() throws -> [RegisteredAutomation] {
-        if let cached = cache.automations { return cached }
+        if let cached = cachedAutomations { return cached }
         let result = try loadFromDisk()
-        cache.automations = result
+        cachedAutomations = result
         return result
     }
 
@@ -119,7 +119,7 @@ struct AutomationRegistry {
             }
             all.append(automation)
             try persist(all)
-            cache.automations = all
+            cachedAutomations = all
             Log.automation.info("Automation saved", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
         }
     }
@@ -147,7 +147,7 @@ struct AutomationRegistry {
             }
             all[index] = automation
             try persist(all)
-            cache.automations = all
+            cachedAutomations = all
             Log.automation.info("Automation updated", metadata: ["id": "\(automation.id)", "name": "\(automation.name)"])
         }
     }
@@ -171,7 +171,7 @@ struct AutomationRegistry {
             }
             all.removeAll { $0.id == id }
             try persist(all)
-            cache.automations = all
+            cachedAutomations = all
             Log.automation.info("Automation deleted", metadata: ["id": "\(id)"])
         }
     }

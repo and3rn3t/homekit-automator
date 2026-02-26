@@ -425,4 +425,156 @@ final class ConditionEvaluatorTests: XCTestCase {
         XCTAssertEqual(evaluator.latitude, 37.7749, accuracy: 0.001)
         XCTAssertEqual(evaluator.longitude, -122.4194, accuracy: 0.001)
     }
+
+    // MARK: - Time Range Edge Cases
+
+    func testTimeRangeOnlyAfter() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeTimeCondition(after: "14:00", before: nil)
+
+        // 15:00 is after 14:00 → met
+        let afternoon = makeDate(hour: 15, minute: 0)
+        let result1 = evaluator.evaluateTimeRange(condition, at: afternoon)
+        XCTAssertTrue(result1.met, "15:00 should be after 14:00")
+
+        // 10:00 is before 14:00 → not met
+        let morning = makeDate(hour: 10, minute: 0)
+        let result2 = evaluator.evaluateTimeRange(condition, at: morning)
+        XCTAssertFalse(result2.met, "10:00 should not be after 14:00")
+    }
+
+    func testTimeRangeOnlyBefore() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeTimeCondition(after: nil, before: "10:00")
+
+        // 08:00 is before 10:00 → met
+        let earlyMorning = makeDate(hour: 8, minute: 0)
+        let result1 = evaluator.evaluateTimeRange(condition, at: earlyMorning)
+        XCTAssertTrue(result1.met, "08:00 should be before 10:00")
+
+        // 12:00 is after 10:00 → not met
+        let noon = makeDate(hour: 12, minute: 0)
+        let result2 = evaluator.evaluateTimeRange(condition, at: noon)
+        XCTAssertFalse(result2.met, "12:00 should not be before 10:00")
+    }
+
+    func testTimeRangeMissingBothFields() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeTimeCondition(after: nil, before: nil)
+        let result = evaluator.evaluateTimeRange(condition)
+        XCTAssertFalse(result.met, "Missing both after & before should fail")
+        XCTAssertTrue(result.reason.contains("missing"),
+                      "Reason should mention missing fields: \(result.reason)")
+    }
+
+    func testTimeRangeMinuteGranularity() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeTimeCondition(after: "08:30", before: "08:45")
+
+        // 08:35 is in range
+        let inside = makeDate(hour: 8, minute: 35)
+        XCTAssertTrue(evaluator.evaluateTimeRange(condition, at: inside).met)
+
+        // 08:29 is out of range
+        let justBefore = makeDate(hour: 8, minute: 29)
+        XCTAssertFalse(evaluator.evaluateTimeRange(condition, at: justBefore).met)
+
+        // 08:45 is out of range (exclusive end)
+        let exactEnd = makeDate(hour: 8, minute: 45)
+        XCTAssertFalse(evaluator.evaluateTimeRange(condition, at: exactEnd).met)
+    }
+
+    // MARK: - Solar Edge Cases
+
+    func testSolarConditionBeforeSunsetAtNoon() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeSolarCondition(requirement: "before_sunset")
+        let noon = makeDate(hour: 12, minute: 0)
+        let result = evaluator.evaluateSolar(condition, at: noon)
+        XCTAssertTrue(result.met, "Noon should be before sunset")
+    }
+
+    func testSolarConditionAfterSunriseAtNoon() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeSolarCondition(requirement: "after_sunrise")
+        let noon = makeDate(hour: 12, minute: 0)
+        let result = evaluator.evaluateSolar(condition, at: noon)
+        XCTAssertTrue(result.met, "Noon should be after sunrise")
+    }
+
+    func testSolarConditionBeforeSunriseAtNoon() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeSolarCondition(requirement: "before_sunrise")
+        let noon = makeDate(hour: 12, minute: 0)
+        let result = evaluator.evaluateSolar(condition, at: noon)
+        XCTAssertFalse(result.met, "Noon should NOT be before sunrise")
+    }
+
+    func testSolarConditionAfterSunsetAtNoon() {
+        let evaluator = ConditionEvaluator()
+        let condition = makeSolarCondition(requirement: "after_sunset")
+        let noon = makeDate(hour: 12, minute: 0)
+        let result = evaluator.evaluateSolar(condition, at: noon)
+        XCTAssertFalse(result.met, "Noon should NOT be after sunset")
+    }
+
+    // MARK: - Day of Week Edge Cases
+
+    func testDayOfWeekSundayMapping() {
+        let evaluator = ConditionEvaluator()
+        // 2026-02-22 is Sunday → 0 in 0-based representation
+        let sunday = makeDate(year: 2026, month: 2, day: 22, hour: 12)
+        let condition = makeDayOfWeekCondition(days: [0])
+        let result = evaluator.evaluateDayOfWeek(condition, at: sunday)
+        XCTAssertTrue(result.met, "Sunday should match day 0")
+        XCTAssertTrue(result.reason.contains("Sunday"))
+    }
+
+    func testDayOfWeekSaturdayMapping() {
+        let evaluator = ConditionEvaluator()
+        // 2026-02-28 is Saturday → 6 in 0-based representation
+        let saturday = makeDate(year: 2026, month: 2, day: 28, hour: 12)
+        let condition = makeDayOfWeekCondition(days: [6])
+        let result = evaluator.evaluateDayOfWeek(condition, at: saturday)
+        XCTAssertTrue(result.met, "Saturday should match day 6")
+        XCTAssertTrue(result.reason.contains("Saturday"))
+    }
+
+    // MARK: - Parse Time Edge Cases
+
+    func testParseTimeEdgeCases() {
+        let evaluator = ConditionEvaluator()
+        // Single digit
+        XCTAssertNil(evaluator.parseTimeToMinutes("12"))
+        // Empty
+        XCTAssertNil(evaluator.parseTimeToMinutes(""))
+        // Extra colons
+        XCTAssertNil(evaluator.parseTimeToMinutes("12:30:45"))
+        // Non-numeric
+        XCTAssertNil(evaluator.parseTimeToMinutes("ab:cd"))
+    }
+
+    // MARK: - Condition Unknown Type
+
+    func testUnknownConditionType() async throws {
+        let evaluator = ConditionEvaluator()
+        let condition = AutomationCondition(
+            type: "weather_forecast",
+            humanReadable: "if rainy",
+            after: nil, before: nil, days: nil,
+            deviceUuid: nil, deviceName: nil,
+            characteristic: nil, operator: nil, value: nil,
+            requirement: nil
+        )
+
+        // Create a dummy SocketClient — the unknown type path doesn't use it.
+        // We need to test the evaluate() method which dispatches by type.
+        // Since SocketClient requires a real connection, we call evaluate and
+        // expect the "Unknown condition type" path for this type.
+        let client = SocketClient()
+        let result = try await evaluator.evaluate(conditions: [condition], using: client)
+        XCTAssertFalse(result.allMet)
+        XCTAssertEqual(result.results.count, 1)
+        XCTAssertTrue(result.results[0].reason.contains("Unknown condition type"))
+    }
 }

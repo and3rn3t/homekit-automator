@@ -21,7 +21,8 @@ struct AutomationValidator {
     enum AutomationValidationError: LocalizedError {
         case deviceNotFound(name: String, suggestion: String?)
         case readOnlyCharacteristic(characteristic: String, deviceName: String)
-        case unsupportedCharacteristic(characteristic: String, category: String, supported: [String])
+        case unsupportedCharacteristic(
+            characteristic: String, category: String, supported: [String])
         case valueOutOfRange(characteristic: String, value: String, validRange: String)
         case invalidValueType(characteristic: String, expected: String, got: String)
         case invalidCronExpression(reason: String)
@@ -37,14 +38,18 @@ struct AutomationValidator {
                 }
                 return msg
             case .readOnlyCharacteristic(let characteristic, let deviceName):
-                return "Cannot set \"\(characteristic)\" on \"\(deviceName)\" — it is a read-only characteristic."
+                return
+                    "Cannot set \"\(characteristic)\" on \"\(deviceName)\" — it is a read-only characteristic."
             case .unsupportedCharacteristic(let characteristic, let category, let supported):
-                return "Characteristic \"\(characteristic)\" is not supported by category \"\(category)\". " +
-                       "Supported: \(supported.joined(separator: ", "))."
+                return
+                    "Characteristic \"\(characteristic)\" is not supported by category \"\(category)\". "
+                    + "Supported: \(supported.joined(separator: ", "))."
             case .valueOutOfRange(let characteristic, let value, let validRange):
-                return "Value \(value) is out of range for \"\(characteristic)\". Valid range: \(validRange)."
+                return
+                    "Value \(value) is out of range for \"\(characteristic)\". Valid range: \(validRange)."
             case .invalidValueType(let characteristic, let expected, let got):
-                return "Invalid value type for \"\(characteristic)\": expected \(expected), got \(got)."
+                return
+                    "Invalid value type for \"\(characteristic)\": expected \(expected), got \(got)."
             case .invalidCronExpression(let reason):
                 return "Invalid cron expression: \(reason)."
             case .emptyActions:
@@ -69,7 +74,7 @@ struct AutomationValidator {
         "windowCovering": ["targetPosition"],
         "switch": ["power"],
         "outlet": ["power"],
-        "sensor": []  // sensors are all read-only
+        "sensor": [],  // sensors are all read-only
     ]
 
     /// All read-only characteristics. Attempting to write to any of these is an error.
@@ -85,7 +90,7 @@ struct AutomationValidator {
         "motionDetected",
         "contactState",
         "lightLevel",
-        "batteryLevel"
+        "batteryLevel",
     ]
 
     // MARK: - PR5: Device Existence Validation
@@ -120,7 +125,9 @@ struct AutomationValidator {
     ///   - deviceName: The device name to look up.
     ///   - deviceMap: Array of device dictionaries from discovery.
     /// - Returns: The matching device dictionary, or nil if not found.
-    func findDevice(named deviceName: String, in deviceMap: [[String: AnyCodableValue]]) -> [String: AnyCodableValue]? {
+    func findDevice(named deviceName: String, in deviceMap: [[String: AnyCodableValue]]) -> [String:
+        AnyCodableValue]?
+    {
         let lowered = deviceName.lowercased()
         return deviceMap.first { device in
             guard let name = device["name"]?.stringValue else { return false }
@@ -177,8 +184,8 @@ struct AutomationValidator {
             for j in 1...n {
                 let cost = aChars[i - 1] == bChars[j - 1] ? 0 : 1
                 currentRow[j] = min(
-                    previousRow[j] + 1,       // deletion
-                    currentRow[j - 1] + 1,     // insertion
+                    previousRow[j] + 1,  // deletion
+                    currentRow[j - 1] + 1,  // insertion
                     previousRow[j - 1] + cost  // substitution
                 )
             }
@@ -201,7 +208,9 @@ struct AutomationValidator {
     ///   - deviceName: The device name (for error messages).
     ///   - deviceInfo: The device dictionary from discovery, expected to contain a "category" key.
     /// - Throws: `AutomationValidationError.readOnlyCharacteristic` or `.unsupportedCharacteristic`.
-    func validateCharacteristic(characteristic: String, deviceName: String, deviceInfo: [String: AnyCodableValue]) throws {
+    func validateCharacteristic(
+        characteristic: String, deviceName: String, deviceInfo: [String: AnyCodableValue]
+    ) throws {
         // Check read-only
         if Self.readOnlyCharacteristics.contains(characteristic) {
             throw AutomationValidationError.readOnlyCharacteristic(
@@ -228,213 +237,132 @@ struct AutomationValidator {
 
     // MARK: - PR7: Value Range Validation
 
+    /// Defines the validation specification for a characteristic's value.
+    private enum ValueSpec {
+        /// Boolean value, also accepts 0/1 as integers
+        case boolean
+        /// Integer within a closed range
+        case intRange(min: Int, max: Int)
+        /// Integer within a closed range, also accepts specific string aliases
+        case intRangeOrStrings(min: Int, max: Int, aliases: [String])
+        /// Double (or int coerced to double) within a closed range
+        case doubleRange(min: Double, max: Double, unit: String)
+        /// Integer 0 or 1, also accepts string aliases and booleans
+        case binaryOrStrings(aliases: [String])
+    }
+
+    /// Table mapping each characteristic to its validation spec.
+    /// Derived from references/device-categories.md.
+    private static let valueSpecs: [String: ValueSpec] = [
+        "power": .boolean,
+        "active": .boolean,
+        "brightness": .intRange(min: 0, max: 100),
+        "colorTemperature": .intRange(min: 50, max: 400),
+        "hue": .doubleRange(min: 0, max: 360, unit: ""),
+        "saturation": .doubleRange(min: 0, max: 100, unit: ""),
+        "targetTemperature": .doubleRange(min: 10, max: 38, unit: " °C"),
+        "targetHumidity": .doubleRange(min: 0, max: 100, unit: ""),
+        "rotationSpeed": .doubleRange(min: 0, max: 100, unit: ""),
+        "hvacMode": .intRangeOrStrings(min: 0, max: 3, aliases: ["off", "heat", "cool", "auto"]),
+        "lockState": .binaryOrStrings(aliases: ["locked", "unlocked", "on", "off"]),
+        "targetPosition": .intRangeOrStrings(min: 0, max: 100, aliases: ["open", "closed"]),
+        "rotationDirection": .intRange(min: 0, max: 1),
+        "swingMode": .intRange(min: 0, max: 1),
+    ]
+
     /// Validates that a value is within the acceptable range for a given characteristic.
     ///
-    /// Enforces the following ranges (from device-categories.md):
-    /// - brightness: 0–100 (Int)
-    /// - hue: 0–360 (Double)
-    /// - saturation: 0–100 (Double)
-    /// - colorTemperature: 50–400 (mireds, Int)
-    /// - targetTemperature: 10–38 (°C, Double)
-    /// - targetHumidity: 0–100 (Double)
-    /// - hvacMode: 0–3 (Int)
-    /// - lockState: 0 or 1 (Int)
-    /// - targetPosition: 0–100 (Int)
-    /// - rotationSpeed: 0–100 (Double)
-    /// - rotationDirection: 0 or 1 (Int)
-    /// - swingMode: 0 or 1 (Int)
-    /// - power/active: Boolean
+    /// Uses a table-driven approach: each characteristic maps to a `ValueSpec` that defines
+    /// the accepted types and ranges. Unknown characteristics are silently allowed to
+    /// preserve extensibility.
     ///
     /// - Parameters:
     ///   - characteristic: The characteristic name.
     ///   - value: The value to validate.
     /// - Throws: `AutomationValidationError.valueOutOfRange` or `.invalidValueType`.
     func validateValueRange(characteristic: String, value: AnyCodableValue) throws {
-        switch characteristic {
+        guard let spec = Self.valueSpecs[characteristic] else {
+            // Unknown characteristic — skip range validation (don't block extensibility)
+            return
+        }
 
-        // Boolean characteristics
-        case "power", "active":
+        switch spec {
+        case .boolean:
             guard value.boolValue != nil else {
-                // Also accept 0/1 as boolean
-                if let intVal = value.intValue, (intVal == 0 || intVal == 1) {
+                if let intVal = value.intValue, intVal == 0 || intVal == 1 { return }
+                throw AutomationValidationError.invalidValueType(
+                    characteristic: characteristic, expected: "boolean",
+                    got: describeValueType(value))
+            }
+
+        case .intRange(let min, let max):
+            guard let intVal = value.intValue else {
+                if let d = value.doubleValue, d >= Double(min), d <= Double(max), d == d.rounded() {
                     return
                 }
+                throw AutomationValidationError.invalidValueType(
+                    characteristic: characteristic, expected: "integer (\(min)–\(max))",
+                    got: describeValueType(value))
+            }
+            guard intVal >= min && intVal <= max else {
+                throw AutomationValidationError.valueOutOfRange(
+                    characteristic: characteristic, value: "\(intVal)", validRange: "\(min)–\(max)")
+            }
+
+        case .intRangeOrStrings(let min, let max, let aliases):
+            if let intVal = value.intValue {
+                guard intVal >= min && intVal <= max else {
+                    throw AutomationValidationError.valueOutOfRange(
+                        characteristic: characteristic, value: "\(intVal)",
+                        validRange: "\(min)–\(max)")
+                }
+            } else if let str = value.stringValue {
+                guard aliases.contains(str.lowercased()) else {
+                    throw AutomationValidationError.valueOutOfRange(
+                        characteristic: characteristic, value: str,
+                        validRange: "\(min)–\(max) or \(aliases.joined(separator: "/"))")
+                }
+            } else {
                 throw AutomationValidationError.invalidValueType(
                     characteristic: characteristic,
-                    expected: "boolean",
-                    got: describeValueType(value)
-                )
+                    expected:
+                        "integer (\(min)–\(max)) or string (\(aliases.joined(separator: "/")))",
+                    got: describeValueType(value))
             }
 
-        // Integer range characteristics
-        case "brightness":
-            guard let intVal = value.intValue else {
-                // Accept doubles that are whole numbers
-                if let d = value.doubleValue, d >= 0, d <= 100, d == d.rounded() {
-                    return
-                }
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "integer (0–100)", got: describeValueType(value)
-                )
-            }
-            guard intVal >= 0 && intVal <= 100 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(intVal)", validRange: "0–100"
-                )
-            }
-
-        case "colorTemperature":
-            guard let intVal = value.intValue else {
-                if let d = value.doubleValue, d >= 50, d <= 400, d == d.rounded() {
-                    return
-                }
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "integer (50–400 mireds)", got: describeValueType(value)
-                )
-            }
-            guard intVal >= 50 && intVal <= 400 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(intVal)", validRange: "50–400 mireds"
-                )
-            }
-
-        // Double range characteristics
-        case "hue":
+        case .doubleRange(let min, let max, let unit):
             guard let dblVal = value.doubleValue else {
                 throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "number (0–360)", got: describeValueType(value)
-                )
+                    characteristic: characteristic, expected: "number (\(min)–\(max)\(unit))",
+                    got: describeValueType(value))
             }
-            guard dblVal >= 0 && dblVal <= 360 else {
+            guard dblVal >= min && dblVal <= max else {
                 throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(dblVal)", validRange: "0–360"
-                )
+                    characteristic: characteristic, value: "\(dblVal)",
+                    validRange: "\(min)–\(max)\(unit)")
             }
 
-        case "saturation":
-            guard let dblVal = value.doubleValue else {
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "number (0–100)", got: describeValueType(value)
-                )
-            }
-            guard dblVal >= 0 && dblVal <= 100 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(dblVal)", validRange: "0–100"
-                )
-            }
-
-        case "targetTemperature":
-            guard let dblVal = value.doubleValue else {
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "number (10–38 °C)", got: describeValueType(value)
-                )
-            }
-            guard dblVal >= 10 && dblVal <= 38 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(dblVal)", validRange: "10–38 °C"
-                )
-            }
-
-        case "targetHumidity":
-            guard let dblVal = value.doubleValue else {
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "number (0–100)", got: describeValueType(value)
-                )
-            }
-            guard dblVal >= 0 && dblVal <= 100 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(dblVal)", validRange: "0–100"
-                )
-            }
-
-        case "rotationSpeed":
-            guard let dblVal = value.doubleValue else {
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "number (0–100)", got: describeValueType(value)
-                )
-            }
-            guard dblVal >= 0 && dblVal <= 100 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(dblVal)", validRange: "0–100"
-                )
-            }
-
-        case "hvacMode":
-            guard let intVal = value.intValue else {
-                // Accept string aliases
-                if let str = value.stringValue,
-                   ["off", "heat", "cool", "auto"].contains(str.lowercased()) {
-                    return
-                }
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "integer (0–3) or string (off/heat/cool/auto)",
-                    got: describeValueType(value)
-                )
-            }
-            guard intVal >= 0 && intVal <= 3 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(intVal)", validRange: "0–3"
-                )
-            }
-
-        case "lockState":
-            // Accept 0/1 int, string aliases, or boolean
+        case .binaryOrStrings(let aliases):
             if let intVal = value.intValue {
                 guard intVal == 0 || intVal == 1 else {
                     throw AutomationValidationError.valueOutOfRange(
-                        characteristic: characteristic, value: "\(intVal)", validRange: "0 (unlocked) or 1 (locked)"
-                    )
+                        characteristic: characteristic, value: "\(intVal)",
+                        validRange: "0/1 or \(aliases.joined(separator: "/"))")
                 }
             } else if let str = value.stringValue {
-                let lowered = str.lowercased()
-                guard ["locked", "unlocked", "on", "off"].contains(lowered) else {
+                guard aliases.contains(str.lowercased()) else {
                     throw AutomationValidationError.valueOutOfRange(
                         characteristic: characteristic, value: str,
-                        validRange: "0/1, locked/unlocked, or on/off"
-                    )
+                        validRange: "0/1, \(aliases.joined(separator: "/"))")
                 }
             } else if value.boolValue != nil {
-                // Boolean is accepted (true = locked, false = unlocked)
-                return
+                return  // Boolean is accepted
             } else {
                 throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "0/1, locked/unlocked, or boolean",
-                    got: describeValueType(value)
-                )
+                    characteristic: characteristic,
+                    expected: "0/1, \(aliases.joined(separator: "/")), or boolean",
+                    got: describeValueType(value))
             }
-
-        case "targetPosition":
-            guard let intVal = value.intValue else {
-                // Also accept string aliases for garage doors
-                if let str = value.stringValue,
-                   ["open", "closed"].contains(str.lowercased()) {
-                    return
-                }
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "integer (0–100)", got: describeValueType(value)
-                )
-            }
-            guard intVal >= 0 && intVal <= 100 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(intVal)", validRange: "0–100"
-                )
-            }
-
-        case "rotationDirection", "swingMode":
-            guard let intVal = value.intValue else {
-                throw AutomationValidationError.invalidValueType(
-                    characteristic: characteristic, expected: "integer (0 or 1)", got: describeValueType(value)
-                )
-            }
-            guard intVal == 0 || intVal == 1 else {
-                throw AutomationValidationError.valueOutOfRange(
-                    characteristic: characteristic, value: "\(intVal)", validRange: "0 or 1"
-                )
-            }
-
-        default:
-            // Unknown characteristic — skip range validation (don't block extensibility)
-            break
         }
     }
 
@@ -454,7 +382,8 @@ struct AutomationValidator {
     /// - Parameter cron: The cron expression string to validate.
     /// - Throws: `AutomationValidationError.invalidCronExpression` if the expression is malformed.
     func validateCronExpression(_ cron: String) throws {
-        let fields = cron.trimmingCharacters(in: .whitespaces).split(separator: " ").map(String.init)
+        let fields = cron.trimmingCharacters(in: .whitespaces).split(separator: " ").map(
+            String.init)
         guard fields.count == 5 else {
             throw AutomationValidationError.invalidCronExpression(
                 reason: "Expected 5 fields (minute hour day month weekday), got \(fields.count)"
@@ -463,11 +392,11 @@ struct AutomationValidator {
 
         let fieldNames = ["minute", "hour", "day-of-month", "month", "day-of-week"]
         let fieldRanges: [(Int, Int)] = [
-            (0, 59),   // minute
-            (0, 23),   // hour
-            (1, 31),   // day of month
-            (1, 12),   // month
-            (0, 7)     // day of week (0 and 7 = Sunday)
+            (0, 59),  // minute
+            (0, 23),  // hour
+            (1, 31),  // day of month
+            (1, 12),  // month
+            (0, 7),  // day of week (0 and 7 = Sunday)
         ]
 
         for (index, field) in fields.enumerated() {
@@ -530,8 +459,9 @@ struct AutomationValidator {
         if field.contains("-") {
             let parts = field.split(separator: "-").map(String.init)
             guard parts.count == 2,
-                  let start = Int(parts[0]),
-                  let end = Int(parts[1]) else {
+                let start = Int(parts[0]),
+                let end = Int(parts[1])
+            else {
                 throw AutomationValidationError.invalidCronExpression(
                     reason: "Invalid range \"\(field)\" in \(name)"
                 )
@@ -579,7 +509,8 @@ struct AutomationValidator {
     /// - Parameter cron: A valid 5-field cron expression.
     /// - Returns: A human-readable string describing the schedule.
     func humanReadableCron(_ cron: String) -> String {
-        let fields = cron.trimmingCharacters(in: .whitespaces).split(separator: " ").map(String.init)
+        let fields = cron.trimmingCharacters(in: .whitespaces).split(separator: " ").map(
+            String.init)
         guard fields.count == 5 else { return cron }
 
         let minute = fields[0]
@@ -604,7 +535,8 @@ struct AutomationValidator {
         let timeDesc = formatTime(minute: minute, hour: hour)
 
         // Build day description
-        let dayDesc = formatDayDescription(dayOfMonth: dayOfMonth, month: month, dayOfWeek: dayOfWeek)
+        let dayDesc = formatDayDescription(
+            dayOfMonth: dayOfMonth, month: month, dayOfWeek: dayOfWeek)
 
         if dayDesc.isEmpty {
             return timeDesc
@@ -627,7 +559,9 @@ struct AutomationValidator {
     }
 
     /// Formats the day-of-month, month, and day-of-week fields into a human-readable description.
-    private func formatDayDescription(dayOfMonth: String, month: String, dayOfWeek: String) -> String {
+    private func formatDayDescription(dayOfMonth: String, month: String, dayOfWeek: String)
+        -> String
+    {
         // Specific day-of-week patterns
         if dayOfMonth == "*" && month == "*" && dayOfWeek != "*" {
             return "Every \(describeDayOfWeek(dayOfWeek))"
@@ -658,11 +592,15 @@ struct AutomationValidator {
         // Check for weekend pattern: 0,6 or 6,0
         if field == "0,6" || field == "6,0" { return "weekend" }
 
-        let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        let dayNames = [
+            "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        ]
 
         // Handle list (e.g., "1,3,5")
         if field.contains(",") {
-            let days = field.split(separator: ",").compactMap { Int($0) }.map { dayNames[min($0, 7)] }
+            let days = field.split(separator: ",").compactMap { Int($0) }.map {
+                dayNames[min($0, 7)]
+            }
             return days.joined(separator: ", ")
         }
 
@@ -684,8 +622,10 @@ struct AutomationValidator {
 
     /// Converts a cron month field into a human-readable name.
     private func describeMonth(_ field: String) -> String {
-        let monthNames = ["", "January", "February", "March", "April", "May", "June",
-                          "July", "August", "September", "October", "November", "December"]
+        let monthNames = [
+            "", "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
         if let m = Int(field), m >= 1, m <= 12 {
             return monthNames[m]
         }
@@ -705,7 +645,9 @@ struct AutomationValidator {
     ///   - definition: The automation definition to validate.
     ///   - deviceMap: Array of device dictionaries from the discovery response.
     /// - Throws: The first `AutomationValidationError` encountered.
-    func validateDefinition(_ definition: AutomationDefinition, deviceMap: [[String: AnyCodableValue]]) throws {
+    func validateDefinition(
+        _ definition: AutomationDefinition, deviceMap: [[String: AnyCodableValue]]
+    ) throws {
         // Must have at least one action
         guard !definition.actions.isEmpty else {
             throw AutomationValidationError.emptyActions
@@ -751,7 +693,9 @@ struct AutomationValidator {
     ///   - actions: The actions to validate.
     ///   - deviceMap: Array of device dictionaries from the discovery response.
     /// - Throws: The first `AutomationValidationError` encountered.
-    func validateActions(_ actions: [AutomationAction], deviceMap: [[String: AnyCodableValue]]) throws {
+    func validateActions(_ actions: [AutomationAction], deviceMap: [[String: AnyCodableValue]])
+        throws
+    {
         guard !actions.isEmpty else {
             throw AutomationValidationError.emptyActions
         }
@@ -818,7 +762,8 @@ func extractDeviceMap(from response: SocketClient.Response) -> [[String: AnyCoda
         return arrayValue.compactMap { $0.dictionaryValue }
     }
     if let dictValue = response.data?.dictionaryValue,
-       let devices = dictValue["devices"]?.arrayValue {
+        let devices = dictValue["devices"]?.arrayValue
+    {
         return devices.compactMap { $0.dictionaryValue }
     }
     return []

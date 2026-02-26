@@ -9,11 +9,13 @@ The HomeKit Automator MCP server exposes 10 tools via stdio transport.
 Returns a complete map of the user's HomeKit setup. Call this first in every new conversation.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `home` | string | no | Target a specific home by name (defaults to primary home) |
 
 **Returns:**
+
 ```json
 {
   "homes": [
@@ -55,6 +57,7 @@ Returns a complete map of the user's HomeKit setup. Call this first in every new
 Query the current state of one or more devices.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `device` | string | yes* | Device name or UUID |
@@ -65,6 +68,7 @@ Query the current state of one or more devices.
 *Provide either `device` or `room`, not both.
 
 **Returns:**
+
 ```json
 {
   "device": "Kitchen Lights",
@@ -88,6 +92,7 @@ Query the current state of one or more devices.
 Send an immediate command to a device.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `device` | string | yes | Device name or UUID |
@@ -109,6 +114,7 @@ Send an immediate command to a device.
 | Switches/Outlets | `power` (bool) |
 
 **Returns:**
+
 ```json
 {
   "device": "Kitchen Lights",
@@ -124,12 +130,14 @@ Send an immediate command to a device.
 Activate an Apple Home scene.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `scene` | string | yes | Scene name or UUID |
 | `home` | string | no | Target a specific home by name |
 
 **Returns:**
+
 ```json
 {
   "scene": "Good Morning",
@@ -150,6 +158,7 @@ device existence (with Levenshtein fuzzy match), characteristic support, writabi
 value ranges, cron parsing, and duplicate name check.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Human-readable automation name |
@@ -162,6 +171,7 @@ value ranges, cron parsing, and duplicate name check.
 See `references/automation-schema.md` for the full trigger, condition, and action schemas.
 
 **Returns:**
+
 ```json
 {
   "id": "auto-uuid-789",
@@ -178,12 +188,14 @@ See `references/automation-schema.md` for the full trigger, condition, and actio
 List all automations managed by this skill.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `filter` | string | no | Filter by: "enabled", "disabled", "schedule", "manual" |
 | `home` | string | no | Target a specific home by name |
 
 **Returns:**
+
 ```json
 {
   "automations": [
@@ -209,6 +221,7 @@ Modify an existing automation. The edit fully decodes and applies new actions, t
 and conditions — not just metadata fields.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | yes* | Automation UUID |
@@ -225,6 +238,7 @@ and conditions — not just metadata fields.
 Remove an automation and its Apple Shortcut.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | yes* | Automation UUID |
@@ -232,6 +246,7 @@ Remove an automation and its Apple Shortcut.
 | `home` | string | no | Target a specific home by name |
 
 **Returns:**
+
 ```json
 {
   "deleted": true,
@@ -249,6 +264,7 @@ device state. If any condition is not met, actions are skipped and the result sh
 conditions failed. When testing with raw `actions`, conditions are not evaluated.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | yes* | Automation UUID |
@@ -259,6 +275,7 @@ conditions failed. When testing with raw `actions`, conditions are not evaluated
 *Provide `id`/`name` for an existing automation, or `actions` for ad-hoc testing.
 
 **Returns (conditions pass):**
+
 ```json
 {
   "tested": "Morning Routine",
@@ -278,6 +295,7 @@ conditions failed. When testing with raw `actions`, conditions are not evaluated
 ```
 
 **Returns (conditions fail):**
+
 ```json
 {
   "tested": "Morning Routine",
@@ -300,12 +318,14 @@ cooling in summer) and pattern-based analysis (detecting repeated manual command
 could be automated).
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `focus` | string | no | Narrow suggestions: "energy", "security", "comfort", "convenience" |
 | `home` | string | no | Target a specific home by name |
 
 **Returns:**
+
 ```json
 {
   "suggestions": [
@@ -332,6 +352,7 @@ could be automated).
 Provide insights about device usage and automation patterns.
 
 **Parameters:**
+
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `period` | string | no | "today", "week", "month" (default: "week") |
@@ -339,6 +360,7 @@ Provide insights about device usage and automation patterns.
 | `home` | string | no | Target a specific home by name |
 
 **Returns:**
+
 ```json
 {
   "period": "week",

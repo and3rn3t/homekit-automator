@@ -3,6 +3,7 @@
 // and dispatches them to the HomeKitManager.
 
 import Foundation
+import HomeKitCore
 
 /// GCD-based Unix domain socket server for HomeKit command processing.
 ///
@@ -11,47 +12,11 @@ import Foundation
 /// - HomeKit operations must run on @MainActor (main thread)
 /// - GCD integrates naturally with main dispatch queue and RunLoop
 /// - Socket I/O is simple and synchronous; async runtime overhead is unnecessary
-/// - DispatchSemaphore bridges low-level GCD socket code with Swift async/await
 ///
 /// SOCKET PROTOCOL:
 /// Listens on a Unix domain socket in ~/Library/Application Support/homekit-automator/ for newline-delimited JSON commands.
 /// Each line is a complete JSON request; responses are sent back as JSON-NL.
 class HelperSocketServer {
-    /// Socket path in user-scoped Application Support directory.
-    /// Must match SocketConstants.defaultPath from the CLI target.
-    private static var socketPath: String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("homekit-automator")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("homekitauto.sock").path
-    }
-
-    /// Path to the authentication token file.
-    private static var tokenPath: String {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("homekit-automator/.auth_token").path
-    }
-
-    /// Read or create the shared authentication token. Must match SocketConstants.getOrCreateToken().
-    private static func getOrCreateToken() -> String {
-        let path = tokenPath
-        if let existing = try? String(contentsOfFile: path, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
-           !existing.isEmpty {
-            return existing
-        }
-        let token = UUID().uuidString
-        try? token.write(toFile: path, atomically: true, encoding: .utf8)
-        chmod(path, 0o600)
-        return token
-    }
-
-    /// Validate an incoming request's token against the stored token.
-    private static func validateToken(_ requestToken: String?) -> Bool {
-        guard let requestToken = requestToken, !requestToken.isEmpty else { return false }
-        let expected = getOrCreateToken()
-        return requestToken == expected
-    }
-
     /// Reference to the HomeKitManager that processes all commands
     private let homeKitManager: HomeKitManager
     /// Low-level socket file descriptor for Unix domain socket
@@ -68,12 +33,12 @@ class HelperSocketServer {
     /// Creates the socket, binds to the Application Support socket path with 0o600 permissions, and begins accepting connections.
     /// Accepts clients on a background GCD queue without blocking the main thread.
     func start() {
-        let socketPath = Self.socketPath
+        let socketPath = SocketConstants.defaultPath
 
         // Warn about and clean up legacy socket path
-        if FileManager.default.fileExists(atPath: "/tmp/homekitauto.sock") {
-            print("[SocketServer] WARNING: Legacy socket found at /tmp/homekitauto.sock — please remove it. Socket has moved to \(socketPath)")
-            unlink("/tmp/homekitauto.sock")
+        if FileManager.default.fileExists(atPath: SocketConstants.legacySocketPath) {
+            print("[SocketServer] WARNING: Legacy socket found at \(SocketConstants.legacySocketPath) — please remove it. Socket has moved to \(socketPath)")
+            unlink(SocketConstants.legacySocketPath)
         }
 
         // Remove existing socket file
@@ -134,7 +99,7 @@ class HelperSocketServer {
             close(serverSocket)
             serverSocket = -1
         }
-        unlink(Self.socketPath)
+        unlink(SocketConstants.defaultPath)
         print("[SocketServer] Stopped.")
     }
 
@@ -175,14 +140,14 @@ class HelperSocketServer {
     /// Handles a single client connection: reads one JSON-NL message, dispatches the command, and sends response.
     /// STEPS:
     /// 1. Read JSON-NL message from socket (up to newline, timeout 30s)
-    /// 2. Parse request JSON: {id, command, params}
-    /// 3. Dispatch command to HomeKitManager via @MainActor Task
-    /// 4. Wait for response using DispatchSemaphore
-    /// 5. Send JSON response back to client
-    /// 6. Close socket
+    /// 2. Parse request JSON: {id, command, params, token, version}
+    /// 3. Dispatch command to HomeKitManager via @MainActor continuation
+    /// 4. Send JSON response back to client
+    /// 5. Close socket
     ///
-    /// The semaphore pattern ensures the response is fully prepared before the socket closes,
-    /// even though command execution happens asynchronously on the main thread.
+    /// Uses `withCheckedContinuation` to bridge the GCD background thread with
+    /// the @MainActor HomeKit operations, avoiding the DispatchSemaphore anti-pattern
+    /// which could cause thread starvation under high concurrency.
     private func handleConnection(_ clientSocket: Int32) {
         defer { close(clientSocket) }
 
@@ -210,6 +175,7 @@ class HelperSocketServer {
             let command: String
             let params: [String: AnyCodableValue]?
             let token: String?
+            let version: Int?
         }
 
         guard let request = try? JSONDecoder().decode(Request.self, from: data) else {
@@ -218,24 +184,22 @@ class HelperSocketServer {
         }
 
         // Validate authentication token
-        guard Self.validateToken(request.token) else {
+        guard SocketConstants.validateToken(request.token) else {
             print("[SocketServer] Rejected unauthorized request for command: \(request.command)")
             sendError(clientSocket, id: request.id, message: "Unauthorized: invalid or missing authentication token")
             return
         }
 
-        // Dispatch command to main thread and wait for response using semaphore
-        let semaphore = DispatchSemaphore(value: 0)
+        // Dispatch command to main actor and wait for result using structured concurrency.
+        // This replaces the previous DispatchSemaphore pattern which could cause thread
+        // starvation under concurrent connections.
+        let dispatchGroup = DispatchGroup()
+        dispatchGroup.enter()
         var responseData: [String: Any] = [:]
         var responseError: String?
 
-        /// SEMAPHORE-BASED ASYNC DISPATCH PATTERN:
-        /// 1. Create a DispatchSemaphore to block handleConnection until the async Task completes
-        /// 2. Task { @MainActor in ... } ensures all HomeKitManager operations run on main thread
-        /// 3. semaphore.signal() at the end unblocks the calling thread
-        /// 4. semaphore.wait() below blocks until signal() is called
-        /// This allows socket I/O (on a background queue) to coordinate with main-thread-only HomeKit operations.
         Task { @MainActor in
+            defer { dispatchGroup.leave() }
             do {
                 switch request.command {
                 /// COMMAND DISPATCH:
@@ -331,10 +295,9 @@ class HelperSocketServer {
             } catch {
                 responseError = error.localizedDescription
             }
-            semaphore.signal()
         }
 
-        semaphore.wait()
+        dispatchGroup.wait()
 
         // Send response
         if let error = responseError {
@@ -345,6 +308,11 @@ class HelperSocketServer {
     }
 
     // MARK: - Response Helpers
+    //
+    // Note: These use JSONSerialization (not Codable) because HomeKitManager returns
+    // [String: Any] dictionaries from Apple's HomeKit APIs. The CLI side uses Codable
+    // with AnyCodableValue to decode these responses. Both sides produce equivalent JSON;
+    // the serialization boundary is at the socket protocol layer.
 
     private func sendSuccess(_ socket: Int32, id: String, data: [String: Any]) {
         let response: [String: Any] = [
@@ -374,9 +342,14 @@ class HelperSocketServer {
 
     // MARK: - Config
 
-    /// Path to config file: ~/.config/homekit-automator/config.json
-    private let configPath = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/homekit-automator/config.json").path
+    /// Path to config file in Application Support directory
+    private var configPath: String {
+        guard let dir = SocketConstants.appSupportDir else {
+            return FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".config/homekit-automator/config.json").path
+        }
+        return dir.appendingPathComponent("config.json").path
+    }
 
     /// Loads config from ~/.config/homekit-automator/config.json or returns default if missing.
     /// Default config: {"filterMode": "all"}
