@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -48,7 +48,7 @@ jobs:
         run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging || true
 
   xcode-build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
