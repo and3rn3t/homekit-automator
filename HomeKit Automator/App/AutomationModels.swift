@@ -1,10 +1,14 @@
 // Models.swift
+// AutomationModels.swift
 // HomeKitAutomator — This file should match HomeKitCore/Models.swift and
 // HomeKitCore/AnyCodableValue.swift — do not edit independently.
 //
 // This is a copy of the canonical models from Sources/HomeKitCore/.
 // HomeKitAutomator is built via Xcode/XcodeGen and cannot import the SPM HomeKitCore
 // module directly. Keep this file in sync with the canonical versions.
+//
+// ⚠️ IMPORTANT: This file was renamed from Models.swift to AutomationModels.swift
+// to avoid conflicts with the Swift Package Manager's HomeKitCore/Models.swift
 
 import Foundation
 
