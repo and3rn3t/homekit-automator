@@ -48,6 +48,7 @@ struct HomeKitAuto: AsyncParsableCommand {
             Discover.self,       // Full home/room/device/scene discovery
             Get.self,            // Read a single device's state
             Set.self,            // Write a characteristic to a device
+            BatchSet.self,       // Batch device control
             Rooms.self,          // List rooms and their accessories
             Scenes.self,         // List available HomeKit scenes
             TriggerScene.self,   // Activate a scene

@@ -19,9 +19,21 @@ jobs:
         with:
           swift-version: '6.0'
 
-      - name: Build CLI (Release)
-        run: swift build -c release --disable-sandbox
+      - name: Build CLI (Release — arm64)
+        run: swift build -c release --disable-sandbox --arch arm64
         working-directory: scripts/swift
+
+      - name: Build CLI (Release — x86_64)
+        run: swift build -c release --disable-sandbox --arch x86_64
+        working-directory: scripts/swift
+
+      - name: Create Universal Binary
+        run: |
+          lipo -create \
+            scripts/swift/.build/arm64-apple-macosx/release/homekitauto \
+            scripts/swift/.build/x86_64-apple-macosx/release/homekitauto \
+            -output scripts/swift/.build/release/homekitauto-universal
+          file scripts/swift/.build/release/homekitauto-universal
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,8 +48,8 @@ jobs:
         run: |
           mkdir -p release-artifacts
 
-          # CLI binary
-          cp scripts/swift/.build/release/homekitauto release-artifacts/
+          # CLI binary (universal)
+          cp scripts/swift/.build/release/homekitauto-universal release-artifacts/homekitauto
 
           # MCP server
           mkdir -p release-artifacts/mcp-server
@@ -52,14 +64,14 @@ jobs:
           cp README.md release-artifacts/
           cp SETUP.md release-artifacts/
 
-          # Create tarball
+          # Create tarball (universal)
           cd release-artifacts
-          tar -czf ../homekit-automator-${GITHUB_REF_NAME}-macos-arm64.tar.gz .
+          tar -czf ../homekit-automator-${GITHUB_REF_NAME}-macos-universal.tar.gz .
           cd ..
 
-          # Create zip
+          # Create zip (universal)
           cd release-artifacts
-          zip -r ../homekit-automator-${GITHUB_REF_NAME}-macos-arm64.zip .
+          zip -r ../homekit-automator-${GITHUB_REF_NAME}-macos-universal.zip .
           cd ..
 
       - name: Generate Release Notes
@@ -81,7 +93,7 @@ jobs:
           echo "3. Build and install the HomeKitHelper app (see SETUP.md)" >> release-notes.md
           echo "" >> release-notes.md
           echo "### Included Artifacts" >> release-notes.md
-          echo "- \`homekitauto\` — CLI binary (macOS arm64)" >> release-notes.md
+          echo "- \`homekitauto\` — CLI binary (macOS universal arm64+x86_64)" >> release-notes.md
           echo "- \`mcp-server/\` — MCP server for AI agent integration" >> release-notes.md
           echo "- \`plugin.json\` — OpenClaw plugin manifest" >> release-notes.md
           echo "- \`SKILL.md\` — Skill documentation" >> release-notes.md
@@ -91,7 +103,22 @@ jobs:
         with:
           body_path: release-notes.md
           files: |
-            homekit-automator-${{ github.ref_name }}-macos-arm64.tar.gz
-            homekit-automator-${{ github.ref_name }}-macos-arm64.zip
+            homekit-automator-${{ github.ref_name }}-macos-universal.tar.gz
+            homekit-automator-${{ github.ref_name }}-macos-universal.zip
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Update Homebrew Formula
+        run: |
+          ./scripts/update-formula.sh "${{ github.ref_name }}"
+          if git diff --quiet Formula/; then
+            echo "Formula unchanged"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -b update-formula-${{ github.ref_name }}
+            git add Formula/homekit-automator.rb
+            git commit -m "Update Homebrew formula for ${{ github.ref_name }}"
+            git push origin update-formula-${{ github.ref_name }}
+            echo "::notice::Formula updated on branch update-formula-${{ github.ref_name }}. Create a PR to merge."
+          fi

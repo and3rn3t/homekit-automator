@@ -152,6 +152,20 @@ switch (command) {
     };
     break;
 
+  case "batch-set": {
+    const actionsIdx = cleanArgs.indexOf("--actions");
+    const batchActions = actionsIdx >= 0 ? JSON.parse(cleanArgs[actionsIdx + 1]) : [];
+    response.results = batchActions.map((a) => ({
+      device: a.device,
+      characteristic: a.characteristic,
+      success: true,
+    }));
+    response.succeeded = batchActions.length;
+    response.failed = 0;
+    response.total = batchActions.length;
+    break;
+  }
+
   case "trigger":
     response.result = {
       scene: cleanArgs[1],
@@ -202,6 +216,19 @@ switch (command) {
       case "test":
         response.testResult = { actionsExecuted: 3, success: true };
         break;
+      case "export":
+        response.exported = 2;
+        response.automations = [
+          { id: "auto-uuid-1", name: "Morning Routine" },
+          { id: "auto-uuid-2", name: "Bedtime" },
+        ];
+        break;
+      case "import":
+        response.imported = 1;
+        response.updated = 0;
+        response.skipped = 0;
+        response.total = 1;
+        break;
       default:
         process.stderr.write(`Unknown automation subcommand: ${subcommand}\n`);
         process.exit(1);
@@ -236,6 +263,21 @@ switch (command) {
       automationsRun: 12,
       estimatedSavings: "$4.50",
     };
+    break;
+  }
+
+  case "intelligence": {
+    // intelligence config [--default-home <name>] [--filter-mode <mode>] [--latitude <n>] [--longitude <n>] [--show] --json
+    const configData = {};
+    const dhIdx = cleanArgs.indexOf("--default-home");
+    if (dhIdx >= 0) configData.defaultHome = cleanArgs[dhIdx + 1];
+    const fmIdx = cleanArgs.indexOf("--filter-mode");
+    if (fmIdx >= 0) configData.filterMode = cleanArgs[fmIdx + 1];
+    const latIdx = cleanArgs.indexOf("--latitude");
+    if (latIdx >= 0) configData.latitude = parseFloat(cleanArgs[latIdx + 1]);
+    const lonIdx = cleanArgs.indexOf("--longitude");
+    if (lonIdx >= 0) configData.longitude = parseFloat(cleanArgs[lonIdx + 1]);
+    Object.assign(response, configData);
     break;
   }
 

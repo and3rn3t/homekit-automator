@@ -1,6 +1,6 @@
 # MCP Tool Specifications
 
-The HomeKit Automator MCP server exposes 10 tools via stdio transport.
+The HomeKit Automator MCP server exposes 15 tools via stdio transport.
 
 ## Discovery & Status
 
@@ -122,6 +122,39 @@ Send an immediate command to a device.
   "previousValue": 80,
   "newValue": 60,
   "confirmed": true
+}
+```
+
+### device_batch
+
+Send multiple device control commands in a single call. Useful for coordinating changes across
+several devices simultaneously (e.g., "set all living room lights to 50% and lock the front door").
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `actions` | array | yes | Array of action objects (see below) |
+| `home` | string | no | Home name to scope all device lookups |
+
+Each action object:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `device` | string | yes | Device name or UUID |
+| `characteristic` | string | yes | Characteristic to set |
+| `value` | any | yes | Target value |
+
+**Returns:**
+
+```json
+{
+  "results": [
+    { "device": "Kitchen Lights", "characteristic": "brightness", "value": 50, "success": true },
+    { "device": "Front Door Lock", "characteristic": "lockState", "value": "locked", "success": true }
+  ],
+  "succeeded": 2,
+  "failed": 0
 }
 ```
 
@@ -308,6 +341,59 @@ conditions failed. When testing with raw `actions`, conditions are not evaluated
 }
 ```
 
+### automation_export
+
+Export automations to JSON for backup or sharing. Exports all automations by default,
+or a single automation when filtered by `id` or `name`.
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | no | Export a specific automation by UUID |
+| `name` | string | no | Export a specific automation by name |
+
+**Returns:**
+
+```json
+{
+  "automations": [
+    {
+      "id": "auto-uuid-789",
+      "name": "Morning Routine",
+      "trigger": { "type": "schedule", "cron": "45 6 * * 1-5" },
+      "actions": [
+        { "device": "Kitchen Lights", "characteristic": "power", "value": true }
+      ],
+      "enabled": true
+    }
+  ],
+  "count": 1
+}
+```
+
+### automation_import
+
+Import automations from a JSON file. The file should contain an array of automation objects
+(same format as `automation_export` output). Validates all automations before importing.
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `file` | string | yes | Path to the JSON file to import |
+| `force` | boolean | no | Overwrite existing automations with same name (default: false) |
+
+**Returns:**
+
+```json
+{
+  "imported": 2,
+  "skipped": 0,
+  "errors": []
+}
+```
+
 ## Intelligence
 
 ### home_suggest
@@ -381,5 +467,29 @@ Provide insights about device usage and automation patterns.
       { "device": "Kitchen Lights", "change": "-5%", "note": "Usage decreased" }
     ]
   }
+}
+```
+
+### home_config
+
+View or update HomeKit Automator configuration. Call without parameters to view current settings.
+
+**Parameters:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `defaultHome` | string | no | Set the default home name |
+| `filterMode` | string | no | Device filter mode: "all" or "allowlist" |
+| `latitude` | number | no | Latitude for solar calculations (e.g. 40.7128) |
+| `longitude` | number | no | Longitude for solar calculations (e.g. -74.0060) |
+
+**Returns:**
+
+```json
+{
+  "defaultHome": "Main House",
+  "filterMode": "all",
+  "latitude": 40.7128,
+  "longitude": -74.006
 }
 ```

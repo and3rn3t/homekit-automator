@@ -375,13 +375,11 @@ struct HomeAnalyzer {
         var failCounts: [String: Int] = [:]
         var timesByAutomation: [String: [Int]] = [:] // hours of day
 
-        let formatter = ISO8601DateFormatter()
-
         for entry in log {
             runCounts[entry.automationName, default: 0] += 1
             failCounts[entry.automationName, default: 0] += entry.failed
 
-            if let date = formatter.date(from: entry.timestamp) {
+            if let date = sharedISO8601Formatter.date(from: entry.timestamp) {
                 let hour = Calendar.current.component(.hour, from: date)
                 timesByAutomation[entry.automationName, default: []].append(hour)
             }

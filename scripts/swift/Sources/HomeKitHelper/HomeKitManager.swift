@@ -5,6 +5,9 @@
 import HomeKit
 import Foundation
 
+/// Shared ISO8601 formatter to avoid repeated allocation.
+private let sharedISO8601Formatter = ISO8601DateFormatter()
+
 /// Thread-safe wrapper around HMHomeManager providing async device access.
 ///
 /// MAIN THREAD REQUIREMENT:
@@ -84,7 +87,7 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
                 "room": accessory.room?.name ?? "Unknown",
                 "characteristic": charName,
                 "value": value ?? "null",
-                "timestamp": ISO8601DateFormatter().string(from: Date()),
+                "timestamp": sharedISO8601Formatter.string(from: Date()),
                 "subscribed": subscribedDevices.contains(deviceName)
             ]
 

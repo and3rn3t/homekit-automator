@@ -38,10 +38,38 @@ jobs:
         run: npm test
         working-directory: scripts/mcp-server
 
+      - name: Check Models.swift Sync
+        run: ./scripts/sync-models.sh
+
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
       - name: Lint Check
+        run: swiftlint lint --config .swiftlint.yml --reporter github-actions-logging || true
+
+  xcode-build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate HomeKitHelper Xcode Project
+        working-directory: scripts/swift/Sources/HomeKitHelper
         run: |
-          if command -v swiftlint &> /dev/null; then
-            swiftlint lint --config .swiftlint.yml --reporter github-actions-logging || true
-          else
-            echo "SwiftLint not installed, skipping lint"
-          fi
+          export HOMEKIT_TEAM_ID="PLACEHOLDER"
+          xcodegen generate --quiet
+
+      - name: Build HomeKitHelper (No Code Sign)
+        working-directory: scripts/swift/Sources/HomeKitHelper
+        run: |
+          xcodebuild \
+            -project HomeKitHelper.xcodeproj \
+            -scheme HomeKitHelper \
+            -configuration Debug \
+            -destination "platform=macOS,variant=Mac Catalyst" \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet || echo "::warning::HomeKitHelper build failed (expected without entitlements)"

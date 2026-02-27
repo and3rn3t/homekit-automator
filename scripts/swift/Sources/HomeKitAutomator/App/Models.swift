@@ -8,6 +8,11 @@
 
 import Foundation
 
+// MARK: - Shared Formatters
+
+/// A shared ISO 8601 date formatter for efficient reuse. Thread-safe once created.
+nonisolated(unsafe) let sharedISO8601Formatter = ISO8601DateFormatter()
+
 // MARK: - Automation Definition (Input from LLM)
 
 /// The raw automation definition as constructed by the LLM from the user's natural language request.
@@ -212,7 +217,7 @@ struct AutomationLogEntry: Codable, Identifiable, Sendable {
 
     /// Parsed date from the ISO 8601 timestamp.
     var date: Date? {
-        ISO8601DateFormatter().date(from: timestamp)
+        sharedISO8601Formatter.date(from: timestamp)
     }
 
     /// Whether all actions succeeded.
@@ -343,18 +348,18 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             self = .null
-        } else if let val = try? container.decode(Bool.self) {
-            self = .bool(val)
-        } else if let val = try? container.decode(Int.self) {
-            self = .int(val)
-        } else if let val = try? container.decode(Double.self) {
-            self = .double(val)
-        } else if let val = try? container.decode(String.self) {
-            self = .string(val)
-        } else if let val = try? container.decode([AnyCodableValue].self) {
-            self = .array(val)
-        } else if let val = try? container.decode([String: AnyCodableValue].self) {
-            self = .dictionary(val)
+        } else if let b = try? container.decode(Bool.self) {
+            self = .bool(b)
+        } else if let i = try? container.decode(Int.self) {
+            self = .int(i)
+        } else if let d = try? container.decode(Double.self) {
+            self = .double(d)
+        } else if let s = try? container.decode(String.self) {
+            self = .string(s)
+        } else if let a = try? container.decode([AnyCodableValue].self) {
+            self = .array(a)
+        } else if let d = try? container.decode([String: AnyCodableValue].self) {
+            self = .dictionary(d)
         } else {
             throw DecodingError.dataCorruptedError(
                 in: container,
@@ -366,13 +371,13 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
-        case .string(let val): try container.encode(val)
-        case .int(let val): try container.encode(val)
-        case .double(let val): try container.encode(val)
-        case .bool(let val): try container.encode(val)
+        case .string(let s): try container.encode(s)
+        case .int(let i): try container.encode(i)
+        case .double(let d): try container.encode(d)
+        case .bool(let b): try container.encode(b)
+        case .array(let a): try container.encode(a)
+        case .dictionary(let d): try container.encode(d)
         case .null: try container.encodeNil()
-        case .array(let val): try container.encode(val)
-        case .dictionary(let val): try container.encode(val)
         }
     }
 }

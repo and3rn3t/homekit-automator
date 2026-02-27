@@ -24,6 +24,8 @@ struct Automation: AsyncParsableCommand {
             AutomationEdit.self,
             AutomationDelete.self,
             AutomationTest.self,
+            AutomationExport.self,
+            AutomationImport.self,
         ]
     )
 }
@@ -73,7 +75,8 @@ struct AutomationCreate: AsyncParsableCommand {
     /// Parses automation definition, generates Shortcut, and registers it
     func run() async throws {
         guard let jsonString = definition ?? readFile(file) else {
-            throw ValidationError("Provide either --definition or --file with the automation definition.")
+            throw ValidationError(
+                "Provide either --definition or --file with the automation definition.")
         }
 
         // Step 1: Parse the automation definition from JSON
@@ -86,13 +89,14 @@ struct AutomationCreate: AsyncParsableCommand {
 
         // Step 2: Load the automation registry and create config directory
         let registry = AutomationRegistry()
-        let configDir = try registry.ensureConfigDir()
+        let configDir = try await registry.ensureConfigDir()
 
         // Step 3: Validate actions against discovered device map
         let client = SocketClient()
         let discoverResponse = try await client.send(command: "discover")
         guard discoverResponse.isOk else {
-            throw SocketError.helperError("Cannot validate devices: \(discoverResponse.error ?? "discovery failed")")
+            throw SocketError.helperError(
+                "Cannot validate devices: \(discoverResponse.error ?? "discovery failed")")
         }
 
         // Step 3b: Validate all actions against device map
@@ -109,9 +113,11 @@ struct AutomationCreate: AsyncParsableCommand {
         // Step 4: Generate the Apple Shortcut file from actions
         let shortcutGenerator = ShortcutGenerator()
         let shortcutName = "HKA: \(definition.name)"
-        let shortcutPath = configDir
+        let shortcutPath =
+            configDir
             .appendingPathComponent("shortcuts")
-            .appendingPathComponent(shortcutName.replacingOccurrences(of: " ", with: "_") + ".shortcut")
+            .appendingPathComponent(
+                shortcutName.replacingOccurrences(of: " ", with: "_") + ".shortcut")
 
         try FileManager.default.createDirectory(
             at: shortcutPath.deletingLastPathComponent(),
@@ -140,10 +146,10 @@ struct AutomationCreate: AsyncParsableCommand {
             actions: definition.actions,
             enabled: definition.enabled ?? true,
             shortcutName: shortcutName,
-            createdAt: ISO8601DateFormatter().string(from: Date())
+            createdAt: sharedISO8601Formatter.string(from: Date())
         )
 
-        try registry.save(automation)
+        try await registry.save(automation)
 
         // Output result
         // Include human-readable cron description if available
@@ -158,7 +164,7 @@ struct AutomationCreate: AsyncParsableCommand {
             "shortcutName": .string(shortcutName),
             "registered": .bool(importResult),
             "trigger": .string(triggerDescription),
-            "actionCount": .int(definition.actions.count)
+            "actionCount": .int(definition.actions.count),
         ]
 
         try printJSON(result)
@@ -210,7 +216,7 @@ struct AutomationList: AsyncParsableCommand {
     /// Loads automation registry and displays filtered list
     func run() async throws {
         let registry = AutomationRegistry()
-        var automations = try registry.loadAll()
+        var automations = try await registry.loadAll()
 
         // Apply filter if specified
         if let filter = filter {
@@ -220,7 +226,9 @@ struct AutomationList: AsyncParsableCommand {
             case "disabled":
                 automations = automations.filter { !$0.enabled }
             case "schedule":
-                automations = automations.filter { $0.trigger.type == "schedule" || $0.trigger.type == "solar" }
+                automations = automations.filter {
+                    $0.trigger.type == "schedule" || $0.trigger.type == "solar"
+                }
             case "manual":
                 automations = automations.filter { $0.trigger.type == "manual" }
             default:
@@ -297,13 +305,14 @@ struct AutomationEdit: AsyncParsableCommand {
             throw ValidationError("Provide either --id or --name to identify the automation.")
         }
 
-        guard var automation = try registry.find(identifier) else {
+        guard var automation = try await registry.find(identifier) else {
             throw ValidationError("Automation not found: \(identifier)")
         }
 
         // Parse changes and apply to automation
         guard let changesData = changes.data(using: .utf8),
-              let changesDict = try JSONSerialization.jsonObject(with: changesData) as? [String: Any] else {
+            let changesDict = try JSONSerialization.jsonObject(with: changesData) as? [String: Any]
+        else {
             throw ValidationError("Invalid changes JSON.")
         }
 
@@ -345,7 +354,8 @@ struct AutomationEdit: AsyncParsableCommand {
         if let conditionsValue = changesDict["conditions"] {
             let conditionsData = try JSONSerialization.data(withJSONObject: conditionsValue)
             do {
-                updatedConditions = try decoder.decode([AutomationCondition].self, from: conditionsData)
+                updatedConditions = try decoder.decode(
+                    [AutomationCondition].self, from: conditionsData)
             } catch {
                 throw ValidationError("Invalid conditions format: \(error.localizedDescription)")
             }
@@ -396,10 +406,12 @@ struct AutomationEdit: AsyncParsableCommand {
         // If actions or trigger changed, regenerate the Apple Shortcut
         if changesDict["actions"] != nil || changesDict["trigger"] != nil {
             let shortcutGenerator = ShortcutGenerator()
-            let configDir = try registry.ensureConfigDir()
-            let shortcutPath = configDir
+            let configDir = try await registry.ensureConfigDir()
+            let shortcutPath =
+                configDir
                 .appendingPathComponent("shortcuts")
-                .appendingPathComponent(automation.shortcutName.replacingOccurrences(of: " ", with: "_") + ".shortcut")
+                .appendingPathComponent(
+                    automation.shortcutName.replacingOccurrences(of: " ", with: "_") + ".shortcut")
 
             try shortcutGenerator.generate(
                 name: automation.shortcutName,
@@ -412,7 +424,7 @@ struct AutomationEdit: AsyncParsableCommand {
             )
         }
 
-        try registry.update(automation)
+        try await registry.update(automation)
 
         try printJSON(automation)
     }
@@ -459,7 +471,7 @@ struct AutomationDelete: AsyncParsableCommand {
             throw ValidationError("Provide either --id or --name.")
         }
 
-        guard let automation = try registry.find(identifier) else {
+        guard let automation = try await registry.find(identifier) else {
             throw ValidationError("Automation not found: \(identifier)")
         }
 
@@ -467,13 +479,13 @@ struct AutomationDelete: AsyncParsableCommand {
         let shortcutDeleted = await ShortcutGenerator.deleteShortcut(name: automation.shortcutName)
 
         // Remove automation from registry
-        try registry.delete(automation.id)
+        try await registry.delete(automation.id)
 
         // Return confirmation with Shortcut removal status
         let result: [String: AnyCodableValue] = [
             "deleted": .bool(true),
             "name": .string(automation.name),
-            "shortcutRemoved": .bool(shortcutDeleted)
+            "shortcutRemoved": .bool(shortcutDeleted),
         ]
 
         try printJSON(result)
@@ -522,6 +534,10 @@ struct AutomationTest: AsyncParsableCommand {
     @Flag(name: .long, help: "Execute even if conditions are not met")
     var force = false
 
+    /// When true, simulate execution without sending commands to devices
+    @Flag(name: .long, help: "Simulate execution without controlling devices")
+    var dryRun = false
+
     /// Loads automation or parses ad-hoc actions and executes them sequentially
     func run() async throws {
         let client = SocketClient()
@@ -544,7 +560,7 @@ struct AutomationTest: AsyncParsableCommand {
             }
 
             let registry = AutomationRegistry()
-            guard let automation = try registry.find(identifier) else {
+            guard let automation = try await registry.find(identifier) else {
                 throw ValidationError("Automation not found: \(identifier)")
             }
             actionsToTest = automation.actions
@@ -561,8 +577,9 @@ struct AutomationTest: AsyncParsableCommand {
             var lat = SolarCalculator.default.latitude
             var lon = SolarCalculator.default.longitude
             if let configResponse = try? await client.send(command: "get_config"),
-               configResponse.isOk,
-               let configData = configResponse.data?.dictionaryValue {
+                configResponse.isOk,
+                let configData = configResponse.data?.dictionaryValue
+            {
                 if let userLat = configData["latitude"]?.doubleValue {
                     lat = userLat
                 }
@@ -572,7 +589,8 @@ struct AutomationTest: AsyncParsableCommand {
             }
 
             let evaluator = ConditionEvaluator(latitude: lat, longitude: lon)
-            let evalResult = try await evaluator.evaluate(conditions: conditionsToCheck, using: client)
+            let evalResult = try await evaluator.evaluate(
+                conditions: conditionsToCheck, using: client)
             conditionsAllMet = evalResult.allMet
 
             for r in evalResult.results {
@@ -580,7 +598,7 @@ struct AutomationTest: AsyncParsableCommand {
                     "condition": .string(r.condition.humanReadable),
                     "type": .string(r.condition.type),
                     "met": .bool(r.met),
-                    "reason": .string(r.reason)
+                    "reason": .string(r.reason),
                 ])
             }
 
@@ -591,7 +609,7 @@ struct AutomationTest: AsyncParsableCommand {
                     "conditionsEvaluated": .array(conditionResults.map { .dictionary($0) }),
                     "conditionsMet": .bool(false),
                     "skipped": .bool(true),
-                    "reason": .string("Conditions not met. Use --force to execute anyway.")
+                    "reason": .string("Conditions not met. Use --force to execute anyway."),
                 ]
                 try printJSON(output)
                 return
@@ -602,9 +620,30 @@ struct AutomationTest: AsyncParsableCommand {
         var results: [[String: AnyCodableValue]] = []
 
         for action in actionsToTest {
-            // Wait for delay specified in action (if any)
-            if action.delaySeconds > 0 {
+            // Wait for delay specified in action (if any) — skip in dry-run
+            if action.delaySeconds > 0 && !dryRun {
                 try await Task.sleep(nanoseconds: UInt64(action.delaySeconds) * 1_000_000_000)
+            }
+
+            // In dry-run mode, report what would happen without executing
+            if dryRun {
+                if action.type == "scene" {
+                    let sceneName = action.sceneName ?? "Unknown"
+                    results.append([
+                        "device": .string(sceneName),
+                        "action": .string("trigger scene"),
+                        "dryRun": .bool(true),
+                        "success": .bool(true),
+                    ])
+                } else {
+                    results.append([
+                        "device": .string(action.deviceName),
+                        "action": .string("\(action.characteristic) -> \(action.value)"),
+                        "dryRun": .bool(true),
+                        "success": .bool(true),
+                    ])
+                }
+                continue
             }
 
             // Handle scene actions (trigger_scene command)
@@ -618,7 +657,7 @@ struct AutomationTest: AsyncParsableCommand {
                     "device": .string(sceneName),
                     "action": .string("trigger scene"),
                     "success": .bool(response.isOk),
-                    "error": response.error.map { .string($0) } ?? .null
+                    "error": response.error.map { .string($0) } ?? .null,
                 ])
                 continue
             }
@@ -629,7 +668,7 @@ struct AutomationTest: AsyncParsableCommand {
                 params: [
                     "uuid": .string(action.deviceUuid),
                     "characteristic": .string(action.characteristic),
-                    "value": action.value
+                    "value": action.value,
                 ]
             )
 
@@ -637,7 +676,7 @@ struct AutomationTest: AsyncParsableCommand {
                 "device": .string(action.deviceName),
                 "action": .string("\(action.characteristic) -> \(action.value)"),
                 "success": .bool(response.isOk),
-                "error": response.error.map { .string($0) } ?? .null
+                "error": response.error.map { .string($0) } ?? .null,
             ])
         }
 
@@ -650,9 +689,11 @@ struct AutomationTest: AsyncParsableCommand {
             "tested": .string(name ?? id ?? "ad-hoc"),
             "results": .array(results.map { .dictionary($0) }),
             "succeeded": .int(succeeded),
-            "failed": .int(failed)
+            "failed": .int(failed),
         ]
-
+        if dryRun {
+            output["dryRun"] = .bool(true)
+        }
         if !conditionResults.isEmpty {
             output["conditionsEvaluated"] = .array(conditionResults.map { .dictionary($0) })
             output["conditionsMet"] = .bool(conditionsAllMet)
@@ -662,5 +703,177 @@ struct AutomationTest: AsyncParsableCommand {
         }
 
         try printJSON(output)
+    }
+}
+
+// MARK: - Export
+
+/// Exports automations to a JSON file for backup or sharing.
+///
+/// Writes all (or filtered) automations as a JSON array to the specified file path,
+/// or to stdout if `--output` is not provided. The output format matches the internal
+/// RegisteredAutomation schema, so it can be re-imported with `automation import`.
+///
+/// Usage:
+///   hka automation export --output ~/backups/automations.json
+///   hka automation export --name "Morning Routine" --json
+///   hka automation export --id abc-123 --output single.json
+struct AutomationExport: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "export",
+        abstract: "Export automations to a JSON file for backup or sharing."
+    )
+
+    /// Optional automation ID to export a single automation
+    @Option(name: .long, help: "Export a specific automation by ID")
+    var id: String?
+
+    /// Optional automation name to export a single automation
+    @Option(name: .long, help: "Export a specific automation by name")
+    var name: String?
+
+    /// File path to write the export. If omitted, writes to stdout.
+    @Option(name: .long, help: "Output file path (defaults to stdout)")
+    var output: String?
+
+    /// When true, outputs as formatted JSON (only relevant for stdout)
+    @Flag(name: .long, help: "Output as JSON")
+    var json = false
+
+    func run() async throws {
+        let registry = AutomationRegistry()
+        let all = try await registry.loadAll()
+
+        // Filter to specific automation if requested
+        let toExport: [RegisteredAutomation]
+        if let id = id {
+            guard let found = all.first(where: { $0.id == id }) else {
+                throw RegistryError.notFound(id)
+            }
+            toExport = [found]
+        } else if let name = name {
+            guard let found = all.first(where: { $0.name.lowercased() == name.lowercased() }) else {
+                throw RegistryError.notFound(name)
+            }
+            toExport = [found]
+        } else {
+            toExport = all
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(toExport)
+
+        if let outputPath = output {
+            let url = URL(fileURLWithPath: (outputPath as NSString).expandingTildeInPath)
+            try data.write(to: url, options: .atomic)
+            let result: [String: AnyCodableValue] = [
+                "exported": .int(toExport.count),
+                "path": .string(url.path),
+            ]
+            try printJSON(result)
+        } else {
+            // Write to stdout
+            if json {
+                let result: [String: AnyCodableValue] = [
+                    "exported": .int(toExport.count),
+                    "automations": .array(
+                        toExport.map { automation in
+                            .dictionary([
+                                "id": .string(automation.id),
+                                "name": .string(automation.name),
+                                "description": automation.description.map { .string($0) } ?? .null,
+                                "enabled": .bool(automation.enabled),
+                                "trigger": .string(automation.trigger.type),
+                                "actionsCount": .int(automation.actions.count),
+                                "createdAt": .string(automation.createdAt),
+                            ])
+                        }),
+                ]
+                try printJSON(result)
+            } else {
+                print(String(data: data, encoding: .utf8) ?? "")
+            }
+        }
+    }
+}
+
+// MARK: - Import
+
+/// Imports automations from a JSON file, adding them to the local registry.
+///
+/// Reads a JSON array of automations from the specified file path and registers each one.
+/// Skips automations that already exist (by name) unless `--force` is specified, in which
+/// case existing automations are overwritten.
+///
+/// Usage:
+///   hka automation import --file ~/backups/automations.json
+///   hka automation import --file shared.json --force
+struct AutomationImport: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "import",
+        abstract: "Import automations from a JSON file."
+    )
+
+    /// Path to the JSON file containing automations to import
+    @Option(name: .long, help: "Path to the automation JSON file to import")
+    var file: String
+
+    /// When true, overwrites existing automations with the same name
+    @Flag(name: .long, help: "Overwrite existing automations with the same name")
+    var force = false
+
+    /// When true, returns results as formatted JSON
+    @Flag(name: .long, help: "Output as JSON")
+    var json = false
+
+    func run() async throws {
+        let url = URL(fileURLWithPath: (file as NSString).expandingTildeInPath)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ValidationError("File not found: \(file)")
+        }
+
+        let data = try Data(contentsOf: url)
+        let automations = try JSONDecoder().decode([RegisteredAutomation].self, from: data)
+
+        let registry = AutomationRegistry()
+        var imported = 0
+        var skipped = 0
+        var updated = 0
+        var errors: [[String: AnyCodableValue]] = []
+
+        for automation in automations {
+            do {
+                let existing = try await registry.find(automation.name)
+                if existing != nil {
+                    if force {
+                        // Update existing automation
+                        var toUpdate = automation
+                        toUpdate.id = existing!.id  // Preserve original ID
+                        try await registry.update(toUpdate)
+                        updated += 1
+                    } else {
+                        skipped += 1
+                    }
+                } else {
+                    try await registry.save(automation)
+                    imported += 1
+                }
+            } catch {
+                errors.append([
+                    "name": .string(automation.name),
+                    "error": .string(error.localizedDescription),
+                ])
+            }
+        }
+
+        let result: [String: AnyCodableValue] = [
+            "imported": .int(imported),
+            "updated": .int(updated),
+            "skipped": .int(skipped),
+            "errors": .array(errors.map { .dictionary($0) }),
+            "total": .int(automations.count),
+        ]
+        try printJSON(result)
     }
 }

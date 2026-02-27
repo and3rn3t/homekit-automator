@@ -15,6 +15,18 @@
 
 import Foundation
 
+// MARK: - Shared Formatters
+
+/// A shared ISO 8601 date formatter for efficient reuse across the codebase.
+///
+/// `ISO8601DateFormatter` is expensive to create but thread-safe once initialized.
+/// Use this shared instance instead of allocating a new formatter in loops or
+/// computed properties.
+///
+/// Marked `nonisolated(unsafe)` because ISO8601DateFormatter is thread-safe for
+/// formatting/parsing when its options are not mutated after creation.
+public nonisolated(unsafe) let sharedISO8601Formatter = ISO8601DateFormatter()
+
 // MARK: - Automation Definition (Input from LLM)
 
 /// The raw automation definition as constructed by the LLM from the user's natural language request.
@@ -332,7 +344,7 @@ public struct AutomationLogEntry: Codable, Identifiable, Sendable {
 
     /// Parsed date from the ISO 8601 timestamp.
     public var date: Date? {
-        ISO8601DateFormatter().date(from: timestamp)
+        sharedISO8601Formatter.date(from: timestamp)
     }
 
     /// Whether all actions succeeded.

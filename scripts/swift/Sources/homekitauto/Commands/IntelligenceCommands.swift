@@ -51,12 +51,13 @@ struct Suggest: AsyncParsableCommand {
         // Step 1: Discover current device map
         let discoverResponse = try await client.send(command: "discover")
         guard discoverResponse.isOk else {
-            throw SocketError.helperError("Cannot discover devices: \(discoverResponse.error ?? "")")
+            throw SocketError.helperError(
+                "Cannot discover devices: \(discoverResponse.error ?? "")")
         }
 
         // Step 2: Load existing automations from registry
         let registry = AutomationRegistry()
-        let existingAutomations = try registry.loadAll()
+        let existingAutomations = try await registry.loadAll()
 
         // Step 3: Analyze home and generate suggestions
         let analyzer = HomeAnalyzer(
@@ -70,7 +71,7 @@ struct Suggest: AsyncParsableCommand {
         suggestions += analyzer.generateSeasonalSuggestions()
 
         // Step 5: Add pattern-based suggestions from execution log
-        let log = try registry.loadLog()
+        let log = try await registry.loadLog()
         suggestions += analyzer.generatePatternSuggestions(from: log)
 
         // Output suggestions in requested format
@@ -146,13 +147,14 @@ struct Energy: AsyncParsableCommand {
         // Step 1: Get current device states and capabilities
         let discoverResponse = try await client.send(command: "discover")
         guard discoverResponse.isOk else {
-            throw SocketError.helperError("Cannot discover devices: \(discoverResponse.error ?? "")")
+            throw SocketError.helperError(
+                "Cannot discover devices: \(discoverResponse.error ?? "")")
         }
 
         // Step 2: Load automation registry and execution history
         let registry = AutomationRegistry()
-        let automations = try registry.loadAll()
-        let log = try registry.loadLog(period: period)
+        let automations = try await registry.loadAll()
+        let log = try await registry.loadLog(period: period)
 
         // Step 3: Analyze current state and generate insights
         let analyzer = HomeAnalyzer(
@@ -165,7 +167,8 @@ struct Energy: AsyncParsableCommand {
         // If --history is set, generate extended historical analysis
         var historyData: [String: AnyCodableValue]? = nil
         if history {
-            historyData = generateEnergyHistory(log: log, automations: automations, deviceMap: discoverResponse.data)
+            historyData = generateEnergyHistory(
+                log: log, automations: automations, deviceMap: discoverResponse.data)
         }
 
         // Output insights in requested format
@@ -235,8 +238,9 @@ struct Energy: AsyncParsableCommand {
                 print("  Device energy estimates:")
                 for est in estimates {
                     if let dict = est.dictionaryValue,
-                       let name = dict["device"]?.stringValue,
-                       let wh = dict["estimatedWh"]?.stringValue {
+                        let name = dict["device"]?.stringValue,
+                        let wh = dict["estimatedWh"]?.stringValue
+                    {
                         print("    - \(name): ~\(wh)")
                     }
                 }
@@ -269,7 +273,9 @@ struct Energy: AsyncParsableCommand {
         for auto in automations {
             let affectsEnergy = auto.actions.contains { action in
                 // Check if the action targets energy characteristics
-                let energyChars: Swift.Set<String> = ["power", "brightness", "targetTemperature", "hvacMode", "active"]
+                let energyChars: Swift.Set<String> = [
+                    "power", "brightness", "targetTemperature", "hvacMode", "active",
+                ]
                 return energyChars.contains(action.characteristic) || action.type == "scene"
             }
             if affectsEnergy {
@@ -279,25 +285,30 @@ struct Energy: AsyncParsableCommand {
         result["energyRelatedAutomations"] = .array(energyRelatedNames.map { .string($0) })
 
         // Week-over-week change in execution frequency
-        let formatter = ISO8601DateFormatter()
         let now = Date()
         let oneWeekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
         let twoWeeksAgo = Calendar.current.date(byAdding: .day, value: -14, to: now) ?? now
 
         let thisWeekRuns = log.filter { entry in
-            guard let date = formatter.date(from: entry.timestamp) else { return false }
+            guard let date = sharedISO8601Formatter.date(from: entry.timestamp) else {
+                return false
+            }
             return date >= oneWeekAgo
         }.count
 
         let lastWeekRuns = log.filter { entry in
-            guard let date = formatter.date(from: entry.timestamp) else { return false }
+            guard let date = sharedISO8601Formatter.date(from: entry.timestamp) else {
+                return false
+            }
             return date >= twoWeeksAgo && date < oneWeekAgo
         }.count
 
         if lastWeekRuns > 0 {
-            let changePercent = Int(Double(thisWeekRuns - lastWeekRuns) / Double(lastWeekRuns) * 100)
+            let changePercent = Int(
+                Double(thisWeekRuns - lastWeekRuns) / Double(lastWeekRuns) * 100)
             let changeStr = changePercent >= 0 ? "+\(changePercent)%" : "\(changePercent)%"
-            result["weekOverWeekChange"] = .string("\(changeStr) (\(lastWeekRuns) -> \(thisWeekRuns) runs)")
+            result["weekOverWeekChange"] = .string(
+                "\(changeStr) (\(lastWeekRuns) -> \(thisWeekRuns) runs)")
         } else {
             result["weekOverWeekChange"] = .string("No data from previous week")
         }
@@ -305,7 +316,7 @@ struct Energy: AsyncParsableCommand {
         // Peak usage hours
         var hourCounts: [Int: Int] = [:]
         for entry in log {
-            if let date = formatter.date(from: entry.timestamp) {
+            if let date = sharedISO8601Formatter.date(from: entry.timestamp) {
                 let hour = Calendar.current.component(.hour, from: date)
                 hourCounts[hour, default: 0] += 1
             }
@@ -313,7 +324,8 @@ struct Energy: AsyncParsableCommand {
 
         let sortedHours = hourCounts.sorted { $0.value > $1.value }
         let topHours = sortedHours.prefix(3).map { (hour, count) -> String in
-            let amPm = hour >= 12 ? "\(hour == 12 ? 12 : hour - 12) PM" : "\(hour == 0 ? 12 : hour) AM"
+            let amPm =
+                hour >= 12 ? "\(hour == 12 ? 12 : hour - 12) PM" : "\(hour == 0 ? 12 : hour) AM"
             return "\(amPm) (\(count) runs)"
         }
         result["peakUsageHours"] = .array(topHours.map { .string($0) })
@@ -322,10 +334,10 @@ struct Energy: AsyncParsableCommand {
         // Watts estimates: light ~10W, thermostat ~varies, outlet ~100W, fan ~50W
         let deviceTypeWatts: [String: Double] = [
             "light": 10.0, "lightbulb": 10.0,
-            "thermostat": 0.0, // Can't estimate HVAC from automation data alone
+            "thermostat": 0.0,  // Can't estimate HVAC from automation data alone
             "outlet": 100.0,
             "fan": 50.0,
-            "switch": 60.0
+            "switch": 60.0,
         ]
 
         // Build device name → category lookup from device map for energy estimates
@@ -334,10 +346,13 @@ struct Energy: AsyncParsableCommand {
             for home in homes {
                 guard let rooms = home.dictionaryValue?["rooms"]?.arrayValue else { continue }
                 for room in rooms {
-                    guard let accessories = room.dictionaryValue?["accessories"]?.arrayValue else { continue }
+                    guard let accessories = room.dictionaryValue?["accessories"]?.arrayValue else {
+                        continue
+                    }
                     for accessory in accessories {
                         if let name = accessory.dictionaryValue?["name"]?.stringValue,
-                           let cat = accessory.dictionaryValue?["category"]?.stringValue {
+                            let cat = accessory.dictionaryValue?["category"]?.stringValue
+                        {
                             deviceCategories[name] = cat
                         }
                     }
@@ -354,12 +369,12 @@ struct Energy: AsyncParsableCommand {
                     // Estimate: device runs for ~1 hour per automation trigger
                     let category = deviceCategories[action.deviceName] ?? "unknown"
                     let watts = deviceTypeWatts[category] ?? 10.0
-                    let estimatedWh = watts * Double(runsForAuto) // 1 hour per run
+                    let estimatedWh = watts * Double(runsForAuto)  // 1 hour per run
                     deviceEstimates.append([
                         "device": .string(action.deviceName),
                         "category": .string(category),
                         "estimatedWh": .string(String(format: "%.0f Wh", estimatedWh)),
-                        "runsInPeriod": .int(runsForAuto)
+                        "runsInPeriod": .int(runsForAuto),
                     ])
                 }
             }
@@ -389,6 +404,7 @@ struct Energy: AsyncParsableCommand {
 ///   hka intelligence config --show
 ///   hka intelligence config --default-home "Main House"
 ///   hka intelligence config --filter-mode allowlist --json
+///   hka intelligence config --latitude 40.7128 --longitude -74.0060
 struct Config: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "View or modify HomeKit Automator configuration."
@@ -402,6 +418,14 @@ struct Config: AsyncParsableCommand {
     @Option(name: .long, help: "Set filter mode: all, allowlist")
     var filterMode: String?
 
+    /// Sets the latitude for solar calculations (sunrise/sunset conditions)
+    @Option(name: .long, help: "Latitude for solar calculations (e.g. 40.7128)")
+    var latitude: Double?
+
+    /// Sets the longitude for solar calculations (sunrise/sunset conditions)
+    @Option(name: .long, help: "Longitude for solar calculations (e.g. -74.0060)")
+    var longitude: Double?
+
     /// When true, explicitly shows current configuration
     @Flag(name: .long, help: "Show current configuration")
     var show = false
@@ -414,14 +438,23 @@ struct Config: AsyncParsableCommand {
     func run() async throws {
         let client = SocketClient()
 
+        let hasUpdates =
+            defaultHome != nil || filterMode != nil || latitude != nil || longitude != nil
+
         // Apply updates if any configuration changes specified
-        if defaultHome != nil || filterMode != nil {
+        if hasUpdates {
             var params: [String: AnyCodableValue] = [:]
             if let home = defaultHome {
                 params["defaultHome"] = .string(home)
             }
             if let mode = filterMode {
                 params["filterMode"] = .string(mode)
+            }
+            if let lat = latitude {
+                params["latitude"] = .double(lat)
+            }
+            if let lon = longitude {
+                params["longitude"] = .double(lon)
             }
 
             let response = try await client.send(command: "set_config", params: params)
@@ -432,7 +465,7 @@ struct Config: AsyncParsableCommand {
         }
 
         // Display configuration (either after update or if --show or no update flags)
-        if show || (defaultHome == nil && filterMode == nil) {
+        if show || !hasUpdates {
             let response = try await client.send(command: "get_config")
             guard response.isOk else {
                 throw SocketError.helperError(response.error ?? "Failed to get config")

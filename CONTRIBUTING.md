@@ -19,7 +19,9 @@ The codebase is organized into three main components:
 | Component | Location | Language | Build Tool |
 |-----------|----------|----------|------------|
 | CLI (`homekitauto`) | `scripts/swift/Sources/homekitauto/` | Swift 6.0 | SPM |
+| Shared Models (`HomeKitCore`) | `scripts/swift/Sources/HomeKitCore/` | Swift 6.0 | SPM |
 | HomeKit Helper | `scripts/swift/Sources/HomeKitHelper/` | Swift 6.0 | XcodeGen + xcodebuild |
+| SwiftUI Menu Bar App | `scripts/swift/Sources/HomeKitAutomator/` | Swift 6.0 | XcodeGen + xcodebuild |
 | MCP Server | `scripts/mcp-server/` | JavaScript (ES modules) | Node.js |
 | Skill Definition | `SKILL.md` + `references/` | Markdown | N/A |
 | Plugin Manifest | `scripts/openclaw-plugin/` | JSON | N/A |
@@ -47,6 +49,27 @@ For Catalyst helper changes, you'll need a full build:
 ```bash
 ./scripts/build.sh --release --install
 ```
+
+### SwiftUI Menu Bar App (HomeKitAutomator)
+
+The `HomeKitAutomator` target is a SwiftUI menu bar app that provides:
+
+- A dashboard view of automation status
+- History and execution log
+- Settings UI for configuration
+- Lifecycle management for the HomeKitHelper process
+
+It lives under `scripts/swift/Sources/HomeKitAutomator/` and is built via XcodeGen + xcodebuild (not SPM).
+Because the Xcode target cannot import SPM modules directly, the `App/Models.swift` file is a
+manual copy of `HomeKitCore/Models.swift` + `HomeKitCore/AnyCodableValue.swift`. After changing
+any model types in `HomeKitCore`, run the sync script to keep the copy in sync:
+
+```bash
+./scripts/sync-models.sh
+```
+
+The app communicates with the HomeKitHelper via the same Unix domain socket that the CLI uses.
+The socket client logic is in `HomeKit/HelperManager.swift`.
 
 ### Using the HomeKit Accessory Simulator
 
@@ -157,6 +180,7 @@ If Apple adds new HomeKit accessory types, or if existing mappings need updating
 ### Step 1: Update the Characteristic Map
 
 In `HomeKitManager.swift`, add entries to both:
+
 - `characteristicTypeName(_:)` — maps Apple's UUID constant to a friendly name
 - `characteristicUUID(for:)` — maps the friendly name back to Apple's UUID
 
@@ -182,6 +206,7 @@ swift test
 ```
 
 The test suite covers:
+
 - Model encoding/decoding roundtrips
 - `AnyCodableValue` type handling
 - Trigger type construction

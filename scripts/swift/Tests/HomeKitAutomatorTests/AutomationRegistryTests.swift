@@ -7,9 +7,9 @@ import XCTest
 final class AutomationRegistryTests: XCTestCase {
 
     // Test that loading from a non-existent file returns empty
-    func testLoadEmptyRegistry() throws {
+    func testLoadEmptyRegistry() async throws {
         let registry = AutomationRegistry()
-        let automations = try registry.loadAll()
+        let automations = try await registry.loadAll()
         // May or may not be empty depending on test environment
         XCTAssertNotNil(automations)
     }

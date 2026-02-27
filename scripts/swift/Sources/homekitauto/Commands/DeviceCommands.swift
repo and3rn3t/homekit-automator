@@ -260,3 +260,101 @@ struct Set: AsyncParsableCommand {
         }
     }
 }
+
+// MARK: - Batch Set
+
+/// Sends multiple device control commands in a single invocation.
+///
+/// Each action is a JSON object with `device`, `characteristic`, and `value` fields.
+/// Actions are executed sequentially, and results for each action are collected.
+///
+/// Usage:
+///   hka batch-set --actions '[{"device":"Light","characteristic":"power","value":true}]' --json
+struct BatchSet: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "batch-set",
+        abstract: "Set multiple device characteristics in one command."
+    )
+
+    /// JSON array of actions, each with device, characteristic, and value
+    @Option(name: .long, help: "JSON array of {device, characteristic, value} objects")
+    var actions: String
+
+    /// Optional home name to scope the device lookups
+    @Option(name: .long, help: "Home name to scope device lookup")
+    var home: String?
+
+    /// When true, returns results as formatted JSON
+    @Flag(name: .long, help: "Output as JSON")
+    var json = false
+
+    func run() async throws {
+        let client = SocketClient()
+
+        guard let actionsData = actions.data(using: .utf8),
+              let actionArray = try? JSONSerialization.jsonObject(with: actionsData) as? [[String: Any]] else {
+            throw ValidationError("Invalid JSON for --actions. Expected an array of objects.")
+        }
+
+        var results: [[String: AnyCodableValue]] = []
+
+        for action in actionArray {
+            guard let device = action["device"] as? String,
+                  let characteristic = action["characteristic"] as? String else {
+                results.append([
+                    "device": .string(action["device"] as? String ?? "unknown"),
+                    "success": .bool(false),
+                    "error": .string("Missing device or characteristic")
+                ])
+                continue
+            }
+
+            let value: AnyCodableValue
+            if let boolVal = action["value"] as? Bool {
+                value = .bool(boolVal)
+            } else if let intVal = action["value"] as? Int {
+                value = .int(intVal)
+            } else if let doubleVal = action["value"] as? Double {
+                value = .double(doubleVal)
+            } else if let strVal = action["value"] as? String {
+                value = .string(strVal)
+            } else {
+                results.append([
+                    "device": .string(device),
+                    "characteristic": .string(characteristic),
+                    "success": .bool(false),
+                    "error": .string("Invalid or missing value")
+                ])
+                continue
+            }
+
+            var setParams: [String: AnyCodableValue] = [
+                "name": .string(device),
+                "characteristic": .string(characteristic),
+                "value": value
+            ]
+            if let home = home {
+                setParams["home"] = .string(home)
+            }
+
+            let response = try await client.send(command: "set_device", params: setParams)
+            results.append([
+                "device": .string(device),
+                "characteristic": .string(characteristic),
+                "success": .bool(response.isOk),
+                "error": response.error.map { .string($0) } ?? .null
+            ])
+        }
+
+        let succeeded = results.filter { $0["success"]?.boolValue == true }.count
+        let failed = results.count - succeeded
+
+        let output: [String: AnyCodableValue] = [
+            "results": .array(results.map { .dictionary($0) }),
+            "succeeded": .int(succeeded),
+            "failed": .int(failed),
+            "total": .int(results.count)
+        ]
+        try printJSON(output)
+    }
+}

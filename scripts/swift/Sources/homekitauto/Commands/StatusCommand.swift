@@ -47,29 +47,40 @@ struct Status: AsyncParsableCommand {
                 try printJSON(data)
             }
         } else {
-            // Format response as human-readable status report
-            print("HomeKit Automator Status")
-            print("========================")
-            if let data = response.data?.dictionaryValue {
-                // Display bridge connection status
-                if let connected = data["connected"]?.boolValue {
-                    print("Bridge: \(connected ? "Connected" : "Disconnected")")
-                }
-                // Display each home and its accessory count
-                if let homes = data["homes"]?.arrayValue {
-                    print("Homes: \(homes.count)")
-                    for home in homes {
-                        if let name = home.dictionaryValue?["name"]?.stringValue,
-                           let count = home.dictionaryValue?["accessoryCount"]?.intValue {
-                            print("  - \(name) (\(count) accessories)")
-                        }
+            print(Self.formatStatusReport(response.data))
+        }
+    }
+
+    /// Formats status response data as a human-readable report.
+    ///
+    /// Extracted as a static function to enable unit testing without socket communication.
+    /// The input data dictionary is expected to contain:
+    /// - `connected` (Bool): Whether the bridge is connected to HomeKit
+    /// - `homes` (Array): List of home objects with `name` and `accessoryCount`
+    /// - `automationCount` (Int): Total number of registered automations
+    static func formatStatusReport(_ data: AnyCodableValue?) -> String {
+        var lines: [String] = []
+        lines.append("HomeKit Automator Status")
+        lines.append("========================")
+
+        if let dict = data?.dictionaryValue {
+            if let connected = dict["connected"]?.boolValue {
+                lines.append("Bridge: \(connected ? "Connected" : "Disconnected")")
+            }
+            if let homes = dict["homes"]?.arrayValue {
+                lines.append("Homes: \(homes.count)")
+                for home in homes {
+                    if let name = home.dictionaryValue?["name"]?.stringValue,
+                       let count = home.dictionaryValue?["accessoryCount"]?.intValue {
+                        lines.append("  - \(name) (\(count) accessories)")
                     }
                 }
-                // Display total automation count from registry
-                if let automations = data["automationCount"]?.intValue {
-                    print("Automations: \(automations)")
-                }
+            }
+            if let automations = dict["automationCount"]?.intValue {
+                lines.append("Automations: \(automations)")
             }
         }
+
+        return lines.joined(separator: "\n")
     }
 }

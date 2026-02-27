@@ -303,6 +303,7 @@ fully implemented and run as a pipeline during `automation_create` and `automati
 5. **Unique name** — Automation names must be unique across the registry. Duplicate names are rejected with an error since names map 1:1 to Shortcut identifiers.
 6. **Non-empty actions** — Must have at least one action. Automations with zero actions are rejected.
 7. **Valid cron** — Schedule triggers must have valid 5-field cron expressions. The parser validates field ranges (minute 0–59, hour 0–23, day 1–31, month 1–12, weekday 0–6) and generates a human-readable description.
+8. **Delay limits** — `delaySeconds` must be between 0 and 3600 (1 hour max)
 
 ## Condition Evaluation
 
@@ -342,4 +343,3 @@ against live state before executing actions:
 
 Condition evaluation is skipped when testing with raw `actions` (ad-hoc testing without
 a saved automation) since there is no condition context.
-8. **Delay limits** — `delaySeconds` must be between 0 and 3600 (1 hour max)

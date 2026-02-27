@@ -167,9 +167,18 @@ final class HelperManager {
         let requestId = UUID().uuidString
         let token = SocketConstants.getOrCreateToken()
         let version = SocketConstants.protocolVersion
-        let json = """
-        {"id":"\(requestId)","command":"\(command)","token":"\(token)","version":\(version)}
-        """
+
+        // Build JSON safely via JSONSerialization to avoid injection from interpolated values.
+        let requestDict: [String: Any] = [
+            "id": requestId,
+            "command": command,
+            "token": token,
+            "version": version
+        ]
+        let jsonData = try JSONSerialization.data(withJSONObject: requestDict)
+        guard let json = String(data: jsonData, encoding: .utf8) else {
+            throw HelperManagerError.sendFailed
+        }
 
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .utility).async { [socketPath] in

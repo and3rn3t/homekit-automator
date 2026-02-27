@@ -2,7 +2,7 @@
  * MCP Server Integration Tests
  *
  * Tests the HomeKit Automator MCP server's JSON-RPC protocol conformance and
- * CLI argument assembly for all 11 tools. Uses a mock CLI (mock-cli.js) that
+ * CLI argument assembly for all 15 tools. Uses a mock CLI (mock-cli.js) that
  * echoes received arguments back in the response so tests can verify the
  * server builds the correct command lines.
  *
@@ -184,18 +184,22 @@ describe("MCP Server Integration Tests", () => {
 
     assert.ok(response.result);
     assert.ok(Array.isArray(response.result.tools));
-    assert.equal(response.result.tools.length, 11);
+    assert.equal(response.result.tools.length, 15);
 
     const toolNames = response.result.tools.map((t) => t.name).sort();
     const expected = [
       "automation_create",
       "automation_delete",
       "automation_edit",
+      "automation_export",
+      "automation_import",
       "automation_list",
       "automation_test",
+      "device_batch",
       "device_control",
       "device_status",
       "energy_summary",
+      "home_config",
       "home_discover",
       "home_suggest",
       "scene_trigger",
@@ -246,6 +250,19 @@ describe("MCP Server Integration Tests", () => {
     assert.ok(roomArgs.includes("--json"));
   });
 
+  it("test_device_status_with_units", async () => {
+    const response = await client.send("tools/call", {
+      name: "device_status",
+      arguments: { device: "Thermostat", units: "fahrenheit" },
+    });
+    const args = getReceivedArgs(response);
+    assert.equal(args[0], "get");
+    assert.equal(args[1], "Thermostat");
+    assert.ok(args.includes("--units"), "Should pass --units flag");
+    assert.equal(args[args.indexOf("--units") + 1], "fahrenheit");
+    assert.ok(args.includes("--json"));
+  });
+
   it("test_device_control", async () => {
     const response = await client.send("tools/call", {
       name: "device_control",
@@ -261,6 +278,47 @@ describe("MCP Server Integration Tests", () => {
     assert.equal(args[1], "Kitchen Lights");
     assert.equal(args[2], "brightness");
     assert.equal(args[3], "75"); // value is String()-ified by the server
+    assert.ok(args.includes("--json"));
+  });
+
+  it("test_device_control_with_units", async () => {
+    const response = await client.send("tools/call", {
+      name: "device_control",
+      arguments: {
+        device: "Thermostat",
+        characteristic: "targetTemperature",
+        value: 72,
+        units: "fahrenheit",
+      },
+    });
+
+    const args = getReceivedArgs(response);
+    assert.equal(args[0], "set");
+    assert.equal(args[1], "Thermostat");
+    assert.equal(args[2], "targetTemperature");
+    assert.equal(args[3], "72");
+    assert.ok(args.includes("--units"), "Should pass --units flag");
+    assert.equal(args[args.indexOf("--units") + 1], "fahrenheit");
+    assert.ok(args.includes("--json"));
+  });
+
+  it("test_device_batch", async () => {
+    const actions = [
+      { device: "Kitchen Lights", characteristic: "power", value: true },
+      { device: "Fan", characteristic: "rotationSpeed", value: 50 },
+    ];
+    const response = await client.send("tools/call", {
+      name: "device_batch",
+      arguments: { actions, home: "My Home" },
+    });
+    const args = getReceivedArgs(response);
+    assert.equal(args[0], "batch-set");
+    assert.ok(args.includes("--actions"), "Should pass --actions flag");
+    const parsed = JSON.parse(args[args.indexOf("--actions") + 1]);
+    assert.equal(parsed.length, 2);
+    assert.equal(parsed[0].device, "Kitchen Lights");
+    assert.ok(args.includes("--home"));
+    assert.equal(args[args.indexOf("--home") + 1], "My Home");
     assert.ok(args.includes("--json"));
   });
 
@@ -422,6 +480,41 @@ describe("MCP Server Integration Tests", () => {
     assert.equal(parsed[0].value, true);
   });
 
+  it("test_automation_export", async () => {
+    // Export all
+    const resp1 = await client.send("tools/call", {
+      name: "automation_export",
+      arguments: {},
+    });
+    const args1 = getReceivedArgs(resp1);
+    assert.equal(args1[0], "automation");
+    assert.equal(args1[1], "export");
+    assert.ok(args1.includes("--json"));
+
+    // Export by name
+    const resp2 = await client.send("tools/call", {
+      name: "automation_export",
+      arguments: { name: "Morning Routine" },
+    });
+    const args2 = getReceivedArgs(resp2);
+    assert.ok(args2.includes("--name"));
+    assert.equal(args2[args2.indexOf("--name") + 1], "Morning Routine");
+  });
+
+  it("test_automation_import", async () => {
+    const resp = await client.send("tools/call", {
+      name: "automation_import",
+      arguments: { file: "/tmp/automations.json", force: true },
+    });
+    const args = getReceivedArgs(resp);
+    assert.equal(args[0], "automation");
+    assert.equal(args[1], "import");
+    assert.ok(args.includes("--file"));
+    assert.equal(args[args.indexOf("--file") + 1], "/tmp/automations.json");
+    assert.ok(args.includes("--force"));
+    assert.ok(args.includes("--json"));
+  });
+
   // ── Intelligence Tools ──
 
   it("test_home_suggest", async () => {
@@ -465,6 +558,34 @@ describe("MCP Server Integration Tests", () => {
     assert.equal(args2[0], "energy");
     assert.ok(args2.includes("--period"));
     assert.equal(args2[args2.indexOf("--period") + 1], "month");
+  });
+
+  it("test_home_config", async () => {
+    // View config (no params) → CLI: intelligence config --json
+    const resp1 = await client.send("tools/call", {
+      name: "home_config",
+      arguments: {},
+    });
+    const args1 = getReceivedArgs(resp1);
+    assert.equal(args1[0], "intelligence");
+    assert.equal(args1[1], "config");
+    assert.ok(args1.includes("--json"));
+    assert.ok(!args1.includes("--show"), "No --show when no updates");
+
+    // Update config → CLI: intelligence config --default-home "Main House" --latitude 40.7128 --show --json
+    const resp2 = await client.send("tools/call", {
+      name: "home_config",
+      arguments: { defaultHome: "Main House", latitude: 40.7128 },
+    });
+    const args2 = getReceivedArgs(resp2);
+    assert.equal(args2[0], "intelligence");
+    assert.equal(args2[1], "config");
+    assert.ok(args2.includes("--default-home"));
+    assert.equal(args2[args2.indexOf("--default-home") + 1], "Main House");
+    assert.ok(args2.includes("--latitude"));
+    assert.equal(args2[args2.indexOf("--latitude") + 1], "40.7128");
+    assert.ok(args2.includes("--show"), "Should include --show when updating");
+    assert.ok(args2.includes("--json"));
   });
 
   // ── Error Handling ──

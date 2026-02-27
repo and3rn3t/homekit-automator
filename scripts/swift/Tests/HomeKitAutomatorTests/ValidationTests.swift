@@ -337,16 +337,19 @@ final class ValidationTests: XCTestCase {
         )
     }
 
-    func testDuplicateNameOnSave() throws {
+    func testDuplicateNameOnSave() async throws {
         setUpRegistry()
         defer { tearDownRegistry() }
 
         let first = makeSampleAutomation(name: "Morning Routine")
-        try registry.save(first)
+        try await registry.save(first)
 
         let second = makeSampleAutomation(name: "Morning Routine")
-        XCTAssertThrowsError(try registry.save(second)) { error in
-            guard case RegistryError.duplicateName(let name) = error else {
+        do {
+            try await registry.save(second)
+            XCTFail("Expected RegistryError.duplicateName")
+        } catch let error as RegistryError {
+            guard case .duplicateName(let name) = error else {
                 XCTFail("Expected RegistryError.duplicateName, got \(error)")
                 return
             }
@@ -354,37 +357,43 @@ final class ValidationTests: XCTestCase {
         }
     }
 
-    func testDuplicateNameCaseInsensitive() throws {
+    func testDuplicateNameCaseInsensitive() async throws {
         setUpRegistry()
         defer { tearDownRegistry() }
 
         let first = makeSampleAutomation(name: "Morning")
-        try registry.save(first)
+        try await registry.save(first)
 
         // "morning" (lowercase) should conflict with "Morning"
         let second = makeSampleAutomation(name: "morning")
-        XCTAssertThrowsError(try registry.save(second)) { error in
-            guard case RegistryError.duplicateName = error else {
+        do {
+            try await registry.save(second)
+            XCTFail("Expected RegistryError.duplicateName")
+        } catch let error as RegistryError {
+            guard case .duplicateName = error else {
                 XCTFail("Expected RegistryError.duplicateName, got \(error)")
                 return
             }
         }
     }
 
-    func testDuplicateNameOnUpdate() throws {
+    func testDuplicateNameOnUpdate() async throws {
         setUpRegistry()
         defer { tearDownRegistry() }
 
         let first = makeSampleAutomation(id: "id-1", name: "Morning")
         let second = makeSampleAutomation(id: "id-2", name: "Evening")
-        try registry.save(first)
-        try registry.save(second)
+        try await registry.save(first)
+        try await registry.save(second)
 
         // Updating "Evening" to "Morning" should conflict
         var updated = second
         updated.name = "Morning"
-        XCTAssertThrowsError(try registry.update(updated)) { error in
-            guard case RegistryError.duplicateName(let name) = error else {
+        do {
+            try await registry.update(updated)
+            XCTFail("Expected RegistryError.duplicateName")
+        } catch let error as RegistryError {
+            guard case .duplicateName(let name) = error else {
                 XCTFail("Expected RegistryError.duplicateName, got \(error)")
                 return
             }
@@ -392,18 +401,18 @@ final class ValidationTests: XCTestCase {
         }
     }
 
-    func testUpdateSameNameAllowed() throws {
+    func testUpdateSameNameAllowed() async throws {
         setUpRegistry()
         defer { tearDownRegistry() }
 
         var automation = makeSampleAutomation(id: "id-1", name: "Morning")
-        try registry.save(automation)
+        try await registry.save(automation)
 
         // Updating the same automation without changing its name should succeed
         automation.description = "Updated description"
-        XCTAssertNoThrow(try registry.update(automation))
+        try await registry.update(automation)
 
-        let found = try registry.find("id-1")
+        let found = try await registry.find("id-1")
         XCTAssertEqual(found?.description, "Updated description")
     }
 

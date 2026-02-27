@@ -6,9 +6,8 @@
 /// with atomic writes to prevent corruption during concurrent access. Additionally, it manages
 /// an execution log at ~/Library/Application Support/homekit-automator/logs/automation-log.json for audit trails.
 ///
-/// Thread Safety: All file operations use atomic writes, but callers should synchronize
-/// multiple concurrent calls to avoid race conditions during rapid load-modify-write cycles.
-/// The registry does not employ internal locking.
+/// Thread Safety: Actor isolation serializes all in-process access. Cross-process safety
+/// is provided by POSIX advisory file locks (`flock(2)`) on the registry directory.
 
 import Foundation
 import HomeKitCore
@@ -23,10 +22,9 @@ import Logging
 /// All data is stored as JSON and persisted atomically to prevent corruption. Directories are
 /// created on demand if they do not exist.
 ///
-/// This is a reference type (class) because it manages file-backed state with an in-memory cache.
-/// Value semantics would cause confusing behavior: two copies would share the same cache object
-/// but could diverge on disk writes.
-final class AutomationRegistry {
+/// Implemented as an actor to provide compile-time data-race safety for in-memory cache access.
+/// Cross-process safety is still handled by POSIX `flock(2)` advisory locks.
+actor AutomationRegistry {
     private let configDirPath: URL
 
     /// In-memory cache for loaded automation data. Avoids re-reading disk on every access.
@@ -259,7 +257,6 @@ final class AutomationRegistry {
         var entries = try JSONDecoder().decode([AutomationLogEntry].self, from: data)
 
         if let period = period {
-            let formatter = ISO8601DateFormatter()
             let now = Date()
             let cutoff: Date
             switch period {
@@ -274,7 +271,7 @@ final class AutomationRegistry {
             }
 
             entries = entries.filter { entry in
-                guard let date = formatter.date(from: entry.timestamp) else { return false }
+                guard let date = sharedISO8601Formatter.date(from: entry.timestamp) else { return false }
                 return date >= cutoff
             }
         }

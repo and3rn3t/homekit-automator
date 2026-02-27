@@ -43,7 +43,7 @@ DerivedData/
 # === Swift Package Manager ===
 .swiftpm/
 Packages/
-Package.resolved
+# Note: Package.resolved is NOT ignored — it's committed for reproducible builds.
 scripts/swift/scripts/
 
 # === Node.js ===

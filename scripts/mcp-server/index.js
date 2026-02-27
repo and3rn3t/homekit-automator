@@ -14,10 +14,10 @@
  * This design keeps the MCP layer zero-dependency (no npm packages required) and makes
  * it easy to test tools independently via the CLI.
  *
- * Exposes 11 tools across three categories:
- *   - Device control:  home_discover, device_status, device_control, scene_trigger
- *   - Automation CRUD: automation_create, automation_list, automation_edit, automation_delete, automation_test
- *   - Intelligence:    home_suggest, energy_summary
+ * Exposes 15 tools across three categories:
+ *   - Device control:  home_discover, device_status, device_control, device_batch, scene_trigger
+ *   - Automation CRUD: automation_create, automation_list, automation_edit, automation_delete, automation_test, automation_export, automation_import
+ *   - Intelligence:    home_suggest, energy_summary, home_config
  *
  * Usage:
  *   node index.js                    # Start the MCP server (reads stdin, writes stdout)
@@ -98,6 +98,11 @@ const TOOLS = [
           type: "string",
           description: "Home name to scope the lookup",
         },
+        units: {
+          type: "string",
+          enum: ["celsius", "fahrenheit"],
+          description: "Temperature unit for display: celsius or fahrenheit (default: system locale)",
+        },
       },
     },
   },
@@ -126,8 +131,41 @@ const TOOLS = [
           type: "string",
           description: "Home name to scope the device lookup",
         },
+        units: {
+          type: "string",
+          enum: ["celsius", "fahrenheit"],
+          description: "Temperature unit for input value: celsius or fahrenheit (default: system locale)",
+        },
       },
       required: ["device", "characteristic", "value"],
+    },
+  },
+  {
+    name: "device_batch",
+    description:
+      "Send multiple device control commands in one call. Each action has device, characteristic, and value.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        actions: {
+          type: "array",
+          description: "Array of {device, characteristic, value} objects to execute",
+          items: {
+            type: "object",
+            properties: {
+              device: { type: "string", description: "Device name or UUID" },
+              characteristic: { type: "string", description: "Characteristic to set" },
+              value: { description: "Target value" },
+            },
+            required: ["device", "characteristic", "value"],
+          },
+        },
+        home: {
+          type: "string",
+          description: "Home name to scope all device lookups",
+        },
+      },
+      required: ["actions"],
     },
   },
   {
@@ -267,6 +305,29 @@ const TOOLS = [
     },
   },
   {
+    name: "automation_export",
+    description: "Export automations to JSON for backup or sharing.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Export a specific automation by UUID" },
+        name: { type: "string", description: "Export a specific automation by name" },
+      },
+    },
+  },
+  {
+    name: "automation_import",
+    description: "Import automations from a JSON file path.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        file: { type: "string", description: "Path to the JSON file to import" },
+        force: { type: "boolean", description: "Overwrite existing automations with same name" },
+      },
+      required: ["file"],
+    },
+  },
+  {
     name: "home_suggest",
     description:
       "Analyze the user's home setup and suggest useful automations they haven't created yet.",
@@ -291,6 +352,33 @@ const TOOLS = [
           type: "string",
           enum: ["today", "week", "month"],
           default: "week",
+        },
+      },
+    },
+  },
+  {
+    name: "home_config",
+    description:
+      "View or update HomeKit Automator configuration (default home, filter mode, solar location).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        defaultHome: {
+          type: "string",
+          description: "Set the default home name",
+        },
+        filterMode: {
+          type: "string",
+          enum: ["all", "allowlist"],
+          description: "Set device filter mode",
+        },
+        latitude: {
+          type: "number",
+          description: "Latitude for solar calculations (e.g. 40.7128)",
+        },
+        longitude: {
+          type: "number",
+          description: "Longitude for solar calculations (e.g. -74.0060)",
         },
       },
     },
@@ -371,14 +459,23 @@ async function handleTool(name, args) {
         throw new Error("Provide either device or room parameter");
       }
       if (args.home) statusArgs.push("--home", args.home);
+      if (args.units) statusArgs.push("--units", args.units);
       return await runCli(statusArgs);
     }
 
     case "device_control": {
-      // Maps to: homekitauto set <device> <characteristic> <value> [--home <name>] --json
+      // Maps to: homekitauto set <device> <characteristic> <value> [--home <name>] [--units <unit>] --json
       const controlArgs = ["set", args.device, args.characteristic, String(args.value)];
       if (args.home) controlArgs.push("--home", args.home);
+      if (args.units) controlArgs.push("--units", args.units);
       return await runCli(controlArgs);
+    }
+
+    case "device_batch": {
+      // Maps to: homekitauto batch-set --actions '<json>' [--home <name>] --json
+      const batchArgs = ["batch-set", "--actions", JSON.stringify(args.actions)];
+      if (args.home) batchArgs.push("--home", args.home);
+      return await runCli(batchArgs);
     }
 
     case "scene_trigger": {
@@ -435,6 +532,21 @@ async function handleTool(name, args) {
       return await runCli(testArgs);
     }
 
+    case "automation_export": {
+      // Maps to: homekitauto automation export [--id <uuid>] [--name <name>] --json
+      const exportArgs = ["automation", "export"];
+      if (args.id) exportArgs.push("--id", args.id);
+      if (args.name) exportArgs.push("--name", args.name);
+      return await runCli(exportArgs);
+    }
+
+    case "automation_import": {
+      // Maps to: homekitauto automation import --file <path> [--force] --json
+      const importArgs = ["automation", "import", "--file", args.file];
+      if (args.force) importArgs.push("--force");
+      return await runCli(importArgs);
+    }
+
     // ── Intelligence Tools ──
 
     case "home_suggest": {
@@ -449,6 +561,20 @@ async function handleTool(name, args) {
       const energyArgs = ["energy"];
       if (args.period) energyArgs.push("--period", args.period);
       return await runCli(energyArgs);
+    }
+
+    case "home_config": {
+      // Maps to: homekitauto intelligence config [--default-home <name>] [--filter-mode <mode>]
+      //          [--latitude <num>] [--longitude <num>] [--show] --json
+      const configArgs = ["intelligence", "config"];
+      const hasUpdates = args.defaultHome || args.filterMode ||
+                         args.latitude !== undefined || args.longitude !== undefined;
+      if (args.defaultHome) configArgs.push("--default-home", args.defaultHome);
+      if (args.filterMode) configArgs.push("--filter-mode", args.filterMode);
+      if (args.latitude !== undefined) configArgs.push("--latitude", String(args.latitude));
+      if (args.longitude !== undefined) configArgs.push("--longitude", String(args.longitude));
+      if (hasUpdates) configArgs.push("--show");
+      return await runCli(configArgs);
     }
 
     default:
@@ -482,15 +608,19 @@ function validateArgs(toolName, args) {
   const required = {
     'device_status': [],
     'device_control': ['device', 'characteristic', 'value'],
+    'device_batch': ['actions'],
     'scene_trigger': ['scene'],
     'automation_create': ['name', 'trigger', 'actions'],
     'automation_edit': ['changes'],
     'automation_delete': [],
     'automation_test': [],
+    'automation_export': [],
+    'automation_import': ['file'],
     'home_discover': [],
     'home_suggest': [],
     'automation_list': [],
-    'energy_summary': []
+    'energy_summary': [],
+    'home_config': []
   };
   const reqs = required[toolName] || [];
   for (const param of reqs) {

@@ -196,7 +196,7 @@ manually unlocking a door) without polling.
 ## Structured Logging
 
 The CLI uses [swift-log](https://github.com/apple/swift-log) for structured logging.
-Log levels are controlled via the `--log-level` flag or the `LOG_LEVEL` environment variable:
+Log levels are controlled via the `LOG_LEVEL` environment variable:
 
 | Level | Usage |
 |-------|-------|
