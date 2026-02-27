@@ -1,7 +1,8 @@
 class HomekitAutomator < Formula
   desc "AI-powered HomeKit automation skill for OpenClaw"
   homepage "https://github.com/and3rn3t/homekit-automator"
-  url "https://github.com/and3rn3t/homekit-automator/archive/refs/tags/v1.0.0.tar.gz"
+  url "https://github.com/and3rn3t/homekit-automator/archive/refs/tags/v1.1.0.tar.gz"
+  # TODO: Update sha256 after cutting the v1.1.0 release tag
   sha256 "PLACEHOLDER"
   license "MIT"
 
@@ -27,9 +28,10 @@ class HomekitAutomator < Formula
   def caveats
     <<~EOS
       HomeKit Automator requires the HomeKitHelper companion app
-      for HomeKit access. Build and install it separately:
-        cd #{share}/homekit-automator
-        ./scripts/build.sh --release --install
+      for HomeKit access. See the README for build instructions.
+
+      Configuration is stored in:
+        ~/Library/Application Support/homekit-automator/
 
       To use with OpenClaw, register the skill:
         openclaw install homekit-automator
@@ -38,5 +40,6 @@ class HomekitAutomator < Formula
 
   test do
     assert_match "HomeKit Automator", shell_output("#{bin}/homekitauto --help")
+    assert_match version.to_s, shell_output("#{bin}/homekitauto --version")
   end
 end

@@ -31,13 +31,13 @@ Common issues and their solutions, organized by symptom.
 
 2. **The socket file is stale.** If the app crashed, the socket file might still exist:
    ```bash
-   rm -f /tmp/homekitauto.sock
+   rm -f ~/Library/Application\ Support/homekit-automator/homekitauto.sock
    # Then relaunch the app
    ```
 
 3. **Permission denied on socket.** The socket should be owned by your user with mode 0600:
    ```bash
-   ls -la /tmp/homekitauto.sock
+   ls -la ~/Library/Application\ Support/homekit-automator/homekitauto.sock
    # Should show: srw------- 1 yourusername ...
    ```
 
@@ -54,7 +54,7 @@ Common issues and their solutions, organized by symptom.
 
 ```bash
 # Test the socket directly
-echo '{"id":"test","command":"status"}' | nc -U /tmp/homekitauto.sock
+echo '{"id":"test","command":"status"}' | nc -U ~/Library/Application\ Support/homekit-automator/homekitauto.sock
 ```
 
 ## HomeKit Access Issues
@@ -273,7 +273,7 @@ automation by `--name` or `--id`.
 
 2. **Privacy restriction.** macOS may block Shortcut imports from untrusted sources. Open Shortcuts.app manually and try importing the generated file:
    ```bash
-   open ~/.config/homekit-automator/shortcuts/
+   open ~/Library/Application\ Support/homekit-automator/shortcuts/
    # Double-click the .shortcut file to import it
    ```
 
@@ -419,7 +419,7 @@ homekitauto discover --json > /tmp/device-map.json
 log show --predicate 'process == "HomeKitHelper"' --last 10m --style compact
 
 # Socket connectivity test
-echo '{"id":"test","command":"status"}' | nc -U /tmp/homekitauto.sock
+echo '{"id":"test","command":"status"}' | nc -U ~/Library/Application\ Support/homekit-automator/homekitauto.sock
 
 # Entitlement verification
 codesign -d --entitlements - "/Applications/HomeKit Automator.app/Contents/Helpers/HomeKitHelper.app"
@@ -432,8 +432,8 @@ sqlite3 ~/Library/Application\ Support/com.apple.TCC/TCC.db \
 shortcuts list | grep "^HKA:"
 
 # Automation registry contents
-cat ~/.config/homekit-automator/automations.json
+cat ~/Library/Application\ Support/homekit-automator/automations.json
 
 # Config contents
-cat ~/.config/homekit-automator/config.json
+cat ~/Library/Application\ Support/homekit-automator/config.json
 ```

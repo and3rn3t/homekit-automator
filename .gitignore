@@ -44,6 +44,7 @@ DerivedData/
 .swiftpm/
 Packages/
 Package.resolved
+scripts/swift/scripts/
 
 # === Node.js ===
 node_modules/

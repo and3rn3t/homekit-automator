@@ -240,7 +240,7 @@ const TOOLS = [
   },
   {
     name: "automation_delete",
-    description: "Delete an automation and its Apple Shortcut.",
+    description: "Delete an automation and its Apple Shortcut. Provide either id or name to identify the automation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -496,6 +496,20 @@ function validateArgs(toolName, args) {
   for (const param of reqs) {
     if (args[param] === undefined || args[param] === null) {
       throw new Error(`Missing required parameter: ${param}`);
+    }
+  }
+
+  // Custom validation: automation_delete needs at least one identifier
+  if (toolName === 'automation_delete') {
+    if (!args.id && !args.name) {
+      throw new Error('Missing required parameter: provide either "id" or "name" to identify the automation to delete');
+    }
+  }
+
+  // Custom validation: automation_test needs at least one of id, name, or actions
+  if (toolName === 'automation_test') {
+    if (!args.id && !args.name && !args.actions) {
+      throw new Error('Missing required parameter: provide "id", "name", or "actions" to identify what to test');
     }
   }
 }

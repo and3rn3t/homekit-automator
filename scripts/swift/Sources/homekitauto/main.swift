@@ -36,10 +36,13 @@ struct HomeKitAuto: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Enable verbose (debug-level) logging.")
     var verbose: Bool = false
 
+    /// Single source of truth for the CLI version string.
+    static let appVersion = "1.1.0"
+
     static let configuration = CommandConfiguration(
         commandName: "homekitauto",
         abstract: "Control Apple HomeKit devices and manage automations from the command line.",
-        version: "1.1.0",
+        version: appVersion,
         subcommands: [
             Status.self,         // Bridge connectivity check
             Discover.self,       // Full home/room/device/scene discovery
@@ -58,7 +61,7 @@ struct HomeKitAuto: AsyncParsableCommand {
 
     mutating func run() async throws {
         Log.configure(verbose: verbose)
-        Log.main.info("HomeKit Automator CLI starting", metadata: ["version": "1.1.0"])
+        Log.main.info("HomeKit Automator CLI starting", metadata: ["version": "\(Self.appVersion)"])
         // Default subcommand (Status) is handled by ArgumentParser
         let status = Status()
         try await status.run()

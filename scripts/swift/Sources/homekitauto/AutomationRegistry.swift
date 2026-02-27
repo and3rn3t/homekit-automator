@@ -1,10 +1,10 @@
 /// AutomationRegistry.swift
 /// Serves as the persistence layer for the HomeKit Automator, managing all read/write operations
-/// on the automation registry stored at ~/.config/homekit-automator/automations.json.
+/// on the automation registry stored at ~/Library/Application Support/homekit-automator/automations.json.
 ///
 /// The registry maintains a JSON file containing an array of `RegisteredAutomation` objects,
 /// with atomic writes to prevent corruption during concurrent access. Additionally, it manages
-/// an execution log at ~/.config/homekit-automator/logs/automation-log.json for audit trails.
+/// an execution log at ~/Library/Application Support/homekit-automator/logs/automation-log.json for audit trails.
 ///
 /// Thread Safety: All file operations use atomic writes, but callers should synchronize
 /// multiple concurrent calls to avoid race conditions during rapid load-modify-write cycles.
@@ -39,7 +39,7 @@ final class AutomationRegistry {
                 .appendingPathComponent("homekit-automator")
     }
 
-    /// Ensures the config directory (~/.config/homekit-automator) exists, creating intermediate
+    /// Ensures the config directory (~/Library/Application Support/homekit-automator) exists, creating intermediate
     /// directories if necessary.
     ///
     /// - Returns: The URL of the config directory.
@@ -192,7 +192,7 @@ final class AutomationRegistry {
     ///
     /// Uses POSIX `flock(2)` with `LOCK_EX` (exclusive lock) to serialize concurrent CLI
     /// processes that may attempt simultaneous registry writes. The lock file is created
-    /// at `~/.config/homekit-automator/.lock`.
+    /// at `~/Library/Application Support/homekit-automator/.lock`.
     ///
     /// - Parameter body: The closure to execute under the lock.
     /// - Returns: The value returned by `body`.

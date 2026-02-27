@@ -55,7 +55,7 @@ This prevents duplicate Shortcuts from accumulating when automations are recreat
 shortcuts list | grep -q "^HKA: Morning Routine$" && echo "exists" || echo "not found"
 
 # Import (only if not already present, or after deleting old version)
-shortcuts import "HKA: Morning Routine" < ~/.config/homekit-automator/shortcuts/HKA_Morning_Routine.shortcut
+shortcuts import "HKA: Morning Routine" < ~/Library/Application\ Support/homekit-automator/shortcuts/HKA_Morning_Routine.shortcut
 ```
 
 **Method 2: URL scheme** (fallback)
@@ -65,7 +65,7 @@ shortcuts://import-shortcut?url=file:///path/to/shortcut&name=HKA:%20Morning%20R
 
 **Method 3: Open file** (most compatible)
 ```bash
-open ~/.config/homekit-automator/shortcuts/HKA_Morning_Routine.shortcut
+open ~/Library/Application\ Support/homekit-automator/shortcuts/HKA_Morning_Routine.shortcut
 ```
 This opens Shortcuts.app and prompts the user to add it.
 

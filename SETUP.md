@@ -308,7 +308,7 @@ git pull
 ./scripts/build.sh --release --install
 ```
 
-The update preserves your configuration at `~/.config/homekit-automator/` — automations, device cache, and settings are not affected by rebuilding.
+The update preserves your configuration at `~/Library/Application Support/homekit-automator/` — automations, device cache, and settings are not affected by rebuilding.
 
 ## Uninstalling
 
@@ -324,8 +324,8 @@ openclaw plugins disable homekit-automator
 openclaw plugins remove homekit-automator
 
 # Remove configuration (optional — only if you want a clean slate)
-rm -rf ~/.config/homekit-automator
+rm -rf ~/Library/Application\ Support/homekit-automator
 
 # Remove the socket file (cleaned up automatically, but just in case)
-rm -f /tmp/homekitauto.sock
+rm -f ~/Library/Application\ Support/homekit-automator/homekitauto.sock
 ```

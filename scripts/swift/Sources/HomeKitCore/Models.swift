@@ -7,7 +7,7 @@
 // These models define the JSON schema that flows between the LLM (via SKILL.md guidance),
 // the MCP server, the CLI tool, and the automation registry on disk. All models conform
 // to Codable for JSON serialization over the Unix socket protocol and for persistence
-// in the automation registry file at ~/.config/homekit-automator/automations.json.
+// in the automation registry file at ~/Library/Application Support/homekit-automator/automations.json.
 //
 // Data flow:
 //   LLM parses user intent → AutomationDefinition (JSON) → CLI validates → RegisteredAutomation (saved)
@@ -308,7 +308,7 @@ public struct AutomationSuggestion: Codable, Sendable {
 
 // MARK: - Automation Log Entry
 
-/// Records a single execution of an automation. Stored in `~/.config/homekit-automator/logs/automation-log.json`.
+/// Records a single execution of an automation. Stored in `~/Library/Application Support/homekit-automator/logs/automation-log.json`.
 /// The log is capped at 1000 entries (oldest entries are pruned). Used by the energy summary
 /// tool to report automation activity over time.
 public struct AutomationLogEntry: Codable, Identifiable, Sendable {

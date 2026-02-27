@@ -138,7 +138,7 @@ Apple's requirements without displaying any UI.
 7. CLI generates Apple Shortcut definition (`.shortcut` file)
 8. CLI checks for existing Shortcut with same name before import
 9. CLI registers Shortcut via `shortcuts` CLI or `open shortcuts://` URL scheme
-9. CLI saves automation to `~/.config/homekit-automator/automations.json`
+9. CLI saves automation to `~/Library/Application Support/homekit-automator/automations.json`
 10. Response flows back through MCP to LLM
 11. LLM confirms to user: "Done! Your Morning Routine will run at 7 AM daily."
 

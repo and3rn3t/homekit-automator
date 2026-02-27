@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two-process architecture: SwiftUI menu bar app + Mac Catalyst HomeKit helper
 - Unix domain socket communication protocol (JSON newline-delimited)
 - Helper process health monitoring with auto-restart (up to 5 per 15-minute window)
-- Configuration persistence at `~/.config/homekit-automator/`
+- Configuration persistence at `~/Library/Application Support/homekit-automator/`
 
 **Device Control**
 

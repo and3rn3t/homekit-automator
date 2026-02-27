@@ -48,11 +48,11 @@ HomeKit Automator is a two-process macOS application:
 
 1. **Main App** — A SwiftUI menu bar app that manages the UI, settings, and helper lifecycle
 2. **HomeKit Bridge** — A Mac Catalyst helper that connects to Apple's HomeKit framework via
-   `HMHomeManager` and communicates over a Unix domain socket at `/tmp/homekitauto.sock`
+   `HMHomeManager` and communicates over a Unix domain socket in `~/Library/Application Support/homekit-automator/`
 
 On top of this foundation, the skill provides:
 
-- **MCP Server** (stdio) — 10 tools that Claude/OpenClaw can call for device control,
+- **MCP Server** (stdio) — 11 tools that Claude/OpenClaw can call for device control,
   automation management, and home intelligence
 - **Automation Engine** — Parses natural language intent (via the LLM) into structured
   automation definitions, validates them against discovered devices (with Levenshtein fuzzy
@@ -311,7 +311,7 @@ Actions skipped (1 of 1 conditions failed)
 
 ## Configuration
 
-The skill stores its configuration at `~/.config/homekit-automator/`:
+The skill stores its configuration at `~/Library/Application Support/homekit-automator/`:
 
 - `config.json` — Active home, device filters, preferences
 - `automations.json` — Local automation registry (source of truth for what's been created)

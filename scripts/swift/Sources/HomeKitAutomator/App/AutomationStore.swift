@@ -2,8 +2,8 @@
 // Observable store that wraps the on-disk automation registry and log for use in SwiftUI views.
 //
 // Reads from / writes to the same JSON files as the CLI:
-//   ~/.config/homekit-automator/automations.json
-//   ~/.config/homekit-automator/logs/automation-log.json
+//   ~/Library/Application Support/homekit-automator/automations.json
+//   ~/Library/Application Support/homekit-automator/logs/automation-log.json
 
 import Foundation
 
@@ -41,9 +41,20 @@ final class AutomationStore {
     // MARK: - Init
 
     init(configDir: URL? = nil) {
-        self.configDir = configDir ?? FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config")
-            .appendingPathComponent("homekit-automator")
+        // Use Application Support directory to match the CLI's AutomationRegistry
+        // (via SocketConstants.appSupportDir). Previously this defaulted to
+        // ~/.config/homekit-automator/ which was a different directory.
+        self.configDir = configDir ?? {
+            guard let appSupport = FileManager.default.urls(
+                for: .applicationSupportDirectory, in: .userDomainMask
+            ).first else {
+                // Practically unreachable on macOS, but provide a safe fallback
+                return FileManager.default.homeDirectoryForCurrentUser
+                    .appendingPathComponent(".config")
+                    .appendingPathComponent("homekit-automator")
+            }
+            return appSupport.appendingPathComponent("homekit-automator")
+        }()
         reload()
     }
 

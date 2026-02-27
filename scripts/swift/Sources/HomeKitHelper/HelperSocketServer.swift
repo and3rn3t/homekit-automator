@@ -149,7 +149,8 @@ class HelperSocketServer {
     /// the @MainActor HomeKit operations, avoiding the DispatchSemaphore anti-pattern
     /// which could cause thread starvation under high concurrency.
     private func handleConnection(_ clientSocket: Int32) {
-        defer { close(clientSocket) }
+        // Note: clientSocket is closed in the dispatchGroup.notify callback below,
+        // NOT in a defer block, because the response is sent asynchronously.
 
         // Read until newline
         var data = Data()
@@ -167,7 +168,10 @@ class HelperSocketServer {
             if data.last == UInt8(ascii: "\n") { break }
         }
 
-        guard !data.isEmpty else { return }
+        guard !data.isEmpty else {
+            close(clientSocket)
+            return
+        }
 
         // Parse request
         struct Request: Codable {
@@ -180,6 +184,7 @@ class HelperSocketServer {
 
         guard let request = try? JSONDecoder().decode(Request.self, from: data) else {
             sendError(clientSocket, id: "unknown", message: "Invalid request JSON")
+            close(clientSocket)
             return
         }
 
@@ -187,12 +192,16 @@ class HelperSocketServer {
         guard SocketConstants.validateToken(request.token) else {
             print("[SocketServer] Rejected unauthorized request for command: \(request.command)")
             sendError(clientSocket, id: request.id, message: "Unauthorized: invalid or missing authentication token")
+            close(clientSocket)
             return
         }
 
-        // Dispatch command to main actor and wait for result using structured concurrency.
-        // This replaces the previous DispatchSemaphore pattern which could cause thread
-        // starvation under concurrent connections.
+        // Dispatch command to main actor and send response via callback.
+        // Previous versions used DispatchGroup.wait() or DispatchSemaphore which block
+        // GCD threads waiting for @MainActor work, risking thread-pool exhaustion under
+        // concurrent connections. Instead, we use DispatchGroup.notify() to send the
+        // response asynchronously when the MainActor work completes, freeing the GCD
+        // thread immediately.
         let dispatchGroup = DispatchGroup()
         dispatchGroup.enter()
         var responseData: [String: Any] = [:]
@@ -268,7 +277,7 @@ class HelperSocketServer {
                 case "get_config":
                     responseData = self.loadConfig()
 
-                /// "set_config": Updates config values (filterMode, defaultHome) and persists to ~/.config/homekit-automator/config.json
+                /// "set_config": Updates config values (filterMode, defaultHome) and persists to ~/Library/Application Support/homekit-automator/config.json
                 case "set_config":
                     // Update config values
                     var config = self.loadConfig()
@@ -297,13 +306,14 @@ class HelperSocketServer {
             }
         }
 
-        dispatchGroup.wait()
-
-        // Send response
-        if let error = responseError {
-            sendError(clientSocket, id: request.id, message: error)
-        } else {
-            sendSuccess(clientSocket, id: request.id, data: responseData)
+        dispatchGroup.notify(queue: .global()) { [self] in
+            // Send response (and close socket) once MainActor work is done
+            if let error = responseError {
+                self.sendError(clientSocket, id: request.id, message: error)
+            } else {
+                self.sendSuccess(clientSocket, id: request.id, data: responseData)
+            }
+            close(clientSocket)
         }
     }
 
@@ -351,7 +361,7 @@ class HelperSocketServer {
         return dir.appendingPathComponent("config.json").path
     }
 
-    /// Loads config from ~/.config/homekit-automator/config.json or returns default if missing.
+    /// Loads config from ~/Library/Application Support/homekit-automator/config.json or returns default if missing.
     /// Default config: {"filterMode": "all"}
     /// - Returns: Dictionary with persisted or default settings
     private func loadConfig() -> [String: Any] {
@@ -362,7 +372,7 @@ class HelperSocketServer {
         return dict
     }
 
-    /// Persists config to ~/.config/homekit-automator/config.json with pretty printing.
+    /// Persists config to ~/Library/Application Support/homekit-automator/config.json with pretty printing.
     /// Creates parent directories if needed; uses atomic writes to prevent corruption.
     /// - Parameters:
     ///   - config: Configuration dictionary to persist

@@ -39,7 +39,7 @@ HomeKit Automator is a three-component system:
 ```
 Claude/OpenClaw ──MCP──> MCP Server (Node.js) ──CLI──> homekitauto (Swift)
                                                               │
-                                                    Unix Socket (/tmp/homekitauto.sock)
+                                                    Unix Socket (~/Library/Application Support/homekit-automator/)
                                                               │
                                                     HomeKitHelper (Mac Catalyst)
                                                               │
@@ -205,7 +205,7 @@ All commands support `--json` for machine-readable output. Use `--home "Name"` t
 
 ## MCP Tools
 
-The MCP server exposes 10 tools for AI agents. See [references/mcp-tools.md](references/mcp-tools.md) for full specifications.
+The MCP server exposes 11 tools for AI agents. See [references/mcp-tools.md](references/mcp-tools.md) for full specifications.
 
 | Tool | Purpose |
 |------|---------|
@@ -249,6 +249,11 @@ homekit-automator/
 │   ├── swift/                        # Swift source code
 │   │   ├── Package.swift             # SPM manifest
 │   │   ├── Sources/
+│   │   │   ├── HomeKitCore/          # Shared library (models, socket constants)
+│   │   │   │   ├── Models.swift
+│   │   │   │   ├── AnyCodableValue.swift
+│   │   │   │   └── SocketConstants.swift
+│   │   │   │
 │   │   │   ├── homekitauto/          # CLI tool
 │   │   │   │   ├── main.swift
 │   │   │   │   ├── SocketClient.swift
@@ -267,6 +272,13 @@ homekit-automator/
 │   │   │   │       ├── RoomAndSceneCommands.swift
 │   │   │   │       ├── AutomationCommand.swift
 │   │   │   │       └── IntelligenceCommands.swift
+│   │   │   │
+│   │   │   ├── HomeKitAutomator/     # SwiftUI menu bar app
+│   │   │   │   ├── App/
+│   │   │   │   ├── Automation/
+│   │   │   │   ├── Config/
+│   │   │   │   ├── HomeKit/
+│   │   │   │   └── Views/
 │   │   │   │
 │   │   │   └── HomeKitHelper/        # Mac Catalyst helper
 │   │   │       ├── project.yml       # XcodeGen specification
@@ -309,7 +321,7 @@ HomeKit Automator supports all standard HomeKit accessory categories. See [refer
 
 ## Configuration
 
-Configuration is stored at `~/.config/homekit-automator/`:
+Configuration is stored at `~/Library/Application Support/homekit-automator/`:
 
 | File | Purpose |
 |------|---------|

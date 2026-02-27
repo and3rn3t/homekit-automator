@@ -470,14 +470,13 @@ struct AutomationDelete: AsyncParsableCommand {
         try registry.delete(automation.id)
 
         // Return confirmation with Shortcut removal status
-        let result: [String: Any] = [
-            "deleted": true,
-            "name": automation.name,
-            "shortcutRemoved": shortcutDeleted
+        let result: [String: AnyCodableValue] = [
+            "deleted": .bool(true),
+            "name": .string(automation.name),
+            "shortcutRemoved": .bool(shortcutDeleted)
         ]
 
-        let jsonData = try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
-        print(String(data: jsonData, encoding: .utf8) ?? "{}")
+        try printJSON(result)
     }
 }
 
@@ -557,7 +556,22 @@ struct AutomationTest: AsyncParsableCommand {
         var conditionsAllMet = true
 
         if !conditionsToCheck.isEmpty {
-            let evaluator = ConditionEvaluator()
+            // Attempt to load user-configured lat/long from config for solar calculations.
+            // Falls back to SolarCalculator defaults (San Francisco) if not configured.
+            var lat = SolarCalculator.default.latitude
+            var lon = SolarCalculator.default.longitude
+            if let configResponse = try? await client.send(command: "get_config"),
+               configResponse.isOk,
+               let configData = configResponse.data?.dictionaryValue {
+                if let userLat = configData["latitude"]?.doubleValue {
+                    lat = userLat
+                }
+                if let userLon = configData["longitude"]?.doubleValue {
+                    lon = userLon
+                }
+            }
+
+            let evaluator = ConditionEvaluator(latitude: lat, longitude: lon)
             let evalResult = try await evaluator.evaluate(conditions: conditionsToCheck, using: client)
             conditionsAllMet = evalResult.allMet
 
