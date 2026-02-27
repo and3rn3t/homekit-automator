@@ -3,7 +3,6 @@
 
 import AppKit
 import Foundation
-import HomeKitCore
 
 /// Status of the HomeKitHelper companion process.
 enum HelperStatus: String, Sendable {
@@ -40,7 +39,9 @@ final class HelperManager {
     private let restartWindowDuration: TimeInterval = 15 * 60
 
     /// Socket path used for health-check pings (defaults to Application Support directory).
-    var socketPath: String = SocketConstants.defaultPath
+    nonisolated var socketPath: String {
+        SocketConstants.defaultPath
+    }
 
     // MARK: - Internal State
 

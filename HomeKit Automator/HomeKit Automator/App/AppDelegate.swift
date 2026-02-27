@@ -144,7 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         
         // If no window is visible, open the main window programmatically
         if NSApp.windows.isEmpty || !NSApp.windows.contains(where: { $0.isVisible && $0.title == "HomeKit Automator" }) {
-            NSApp.sendAction(Selector(("newDocument:")), to: nil, from: nil)
+            NSApp.sendAction(NSSelectorFromString("newDocument:"), to: nil, from: nil)
         }
     }
 
@@ -203,7 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        NSApp.sendAction(NSSelectorFromString("showSettingsWindow:"), to: nil, from: nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 

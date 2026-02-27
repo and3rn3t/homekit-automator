@@ -16,7 +16,7 @@ struct AutomationListItem: View {
             // Trigger type icon
             triggerIcon
                 .font(.title2)
-                .foregroundStyle(automation.enabled ? .accentColor : .secondary)
+                .foregroundStyle(automation.enabled ? Color.accentColor : Color.secondary)
                 .frame(width: 32)
 
             // Name and description
