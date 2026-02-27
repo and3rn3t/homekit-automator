@@ -4,6 +4,7 @@
 scripts/swift/.build/
 scripts/swift/Sources/HomeKitHelper/HomeKitHelper.xcodeproj/
 scripts/swift/Sources/HomeKitHelper/DerivedData/
+scripts/swift/Sources/HomeKitAutomator/HomeKitAutomator.xcodeproj/
 scripts/swift/Sources/HomeKitAutomator/DerivedData/
 
 # === Environment and secrets ===

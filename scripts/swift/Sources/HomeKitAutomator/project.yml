@@ -1,0 +1,53 @@
+# XcodeGen project specification for HomeKitAutomator
+# This generates an Xcode project for the macOS SwiftUI menu bar app.
+# Build with: cd Sources/HomeKitAutomator && xcodegen && open HomeKitAutomator.xcodeproj
+#
+# The menu bar app provides:
+#   - Automation dashboard UI
+#   - Execution history / log viewer
+#   - Settings management
+#   - HomeKitHelper process lifecycle management
+
+name: HomeKitAutomator
+options:
+  bundleIdPrefix: com.homekitautomator
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  defaultConfig: Debug
+
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: com.homekitautomator.app
+    INFOPLIST_FILE: Info.plist
+    CODE_SIGN_ENTITLEMENTS: HomeKitAutomator.entitlements
+    DEVELOPMENT_TEAM: "${HOMEKIT_TEAM_ID}"
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+
+targets:
+  HomeKitAutomator:
+    type: application
+    platform: macOS
+    sources:
+      # App source files (all subdirectories)
+      - path: .
+        excludes:
+          - project.yml
+          - "*.entitlements"
+          - Info.plist
+      # Include HomeKitCore sources so SocketConstants and shared models
+      # are compiled into the target directly. The Xcode target cannot use
+      # SPM modules, so we compile the shared source files as part of this target.
+      - path: ../HomeKitCore
+        name: HomeKitCore
+        compilerFlags: []
+    settings:
+      base:
+        PRODUCT_NAME: HomeKit Automator
+        # Menu bar agent — no Dock icon
+        LS_UI_ELEMENT: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+    entitlements:
+      path: HomeKitAutomator.entitlements
