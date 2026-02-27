@@ -13,6 +13,17 @@ struct HomeKitAutomatorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
+        // Main window (opened from menu bar)
+        Window("HomeKit Automator", id: "main") {
+            ContentView()
+                .frame(minWidth: 800, minHeight: 600)
+        }
+        .defaultSize(width: 900, height: 700)
+        .commands {
+            CommandGroup(replacing: .newItem) { }
+        }
+        
+        // Settings window
         Settings {
             SettingsView()
         }

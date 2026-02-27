@@ -1,4 +1,3 @@
-// Models.swift
 // AutomationModels.swift
 // HomeKitAutomator — This file should match HomeKitCore/Models.swift and
 // HomeKitCore/AnyCodableValue.swift — do not edit independently.

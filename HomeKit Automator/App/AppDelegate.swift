@@ -52,8 +52,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(statusMenuItem)
 
         menu.addItem(NSMenuItem.separator())
+        
+        let mainWindowItem = NSMenuItem(title: "Show Automations…", action: #selector(openMainWindow), keyEquivalent: "a")
+        mainWindowItem.target = self
+        menu.addItem(mainWindowItem)
 
-        let dashboardItem = NSMenuItem(title: "Dashboard…", action: #selector(openDashboard), keyEquivalent: "d")
+        let dashboardItem = NSMenuItem(title: "Legacy Dashboard…", action: #selector(openDashboard), keyEquivalent: "d")
         dashboardItem.target = self
         menu.addItem(dashboardItem)
 
@@ -129,6 +133,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // MARK: - Menu Actions
+    
+    @objc private func openMainWindow() {
+        // Use the new SwiftUI Window API - open by ID
+        if let url = URL(string: "homekitautomator://main") {
+            NSWorkspace.shared.open(url)
+        }
+        // Fallback: activate the app which will show windows
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // If no window is visible, open the main window programmatically
+        if NSApp.windows.isEmpty || !NSApp.windows.contains(where: { $0.isVisible && $0.title == "HomeKit Automator" }) {
+            NSApp.sendAction(Selector(("newDocument:")), to: nil, from: nil)
+        }
+    }
 
     @objc private func openDashboard() {
         if let window = dashboardWindow {

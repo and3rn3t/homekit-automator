@@ -6,6 +6,23 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3DC6BB622F5142FC00A187AC /* AutomationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB5E2F5142FC00A187AC /* AutomationStore.swift */; };
+		3DC6BB632F5142FC00A187AC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB5D2F5142FC00A187AC /* AppDelegate.swift */; };
+		3DC6BB642F5142FC00A187AC /* AutomationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB602F5142FC00A187AC /* AutomationModels.swift */; };
+		3DC6BB652F5142FC00A187AC /* HomeKitAutomatorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB5F2F5142FC00A187AC /* HomeKitAutomatorApp.swift */; };
+		3DC6BB692F51430400A187AC /* AutomationListItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB662F51430400A187AC /* AutomationListItem.swift */; };
+		3DC6BB6A2F51430400A187AC /* LogEntryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB672F51430400A187AC /* LogEntryRow.swift */; };
+		3DC6BB6E2F51431000A187AC /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB6C2F51431000A187AC /* SettingsView.swift */; };
+		3DC6BB6F2F51431000A187AC /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB6B2F51431000A187AC /* AppSettings.swift */; };
+		3DC6BB722F51431600A187AC /* HelperManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB702F51431600A187AC /* HelperManager.swift */; };
+		3DC6BB782F51432100A187AC /* AnyCodableValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB742F51432100A187AC /* AnyCodableValue.swift */; };
+		3DC6BB792F51432100A187AC /* SocketConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB762F51432100A187AC /* SocketConstants.swift */; };
+		3DC6BB7E2F51432700A187AC /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB7C2F51432700A187AC /* HistoryView.swift */; };
+		3DC6BB7F2F51432700A187AC /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DC6BB7B2F51432700A187AC /* DashboardView.swift */; };
+		3DC6BB822F51432D00A187AC /* HomeKit Automator.app in Resources */ = {isa = PBXBuildFile; fileRef = 3DC6BB802F51432D00A187AC /* HomeKit Automator.app */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		3DC6BB412F51426000A187AC /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +44,20 @@
 		3DC6BB312F51425F00A187AC /* HomeKit Automator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "HomeKit Automator.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DC6BB402F51426000A187AC /* HomeKit AutomatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "HomeKit AutomatorTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3DC6BB4A2F51426000A187AC /* HomeKit AutomatorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "HomeKit AutomatorUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3DC6BB5D2F5142FC00A187AC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		3DC6BB5E2F5142FC00A187AC /* AutomationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationStore.swift; sourceTree = "<group>"; };
+		3DC6BB5F2F5142FC00A187AC /* HomeKitAutomatorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeKitAutomatorApp.swift; sourceTree = "<group>"; };
+		3DC6BB602F5142FC00A187AC /* AutomationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationModels.swift; sourceTree = "<group>"; };
+		3DC6BB662F51430400A187AC /* AutomationListItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationListItem.swift; sourceTree = "<group>"; };
+		3DC6BB672F51430400A187AC /* LogEntryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogEntryRow.swift; sourceTree = "<group>"; };
+		3DC6BB6B2F51431000A187AC /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
+		3DC6BB6C2F51431000A187AC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		3DC6BB702F51431600A187AC /* HelperManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperManager.swift; sourceTree = "<group>"; };
+		3DC6BB742F51432100A187AC /* AnyCodableValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnyCodableValue.swift; sourceTree = "<group>"; };
+		3DC6BB762F51432100A187AC /* SocketConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketConstants.swift; sourceTree = "<group>"; };
+		3DC6BB7B2F51432700A187AC /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		3DC6BB7C2F51432700A187AC /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		3DC6BB802F51432D00A187AC /* HomeKit Automator.app */ = {isa = PBXFileReference; lastKnownFileType = wrapper.application; name = "HomeKit Automator.app"; path = "../../../../HomeKitAutomator-bshbmozhwqlyjqckkfgrxlwcwtyu/Build/Products/Debug/HomeKit Automator.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +110,14 @@
 				3DC6BB432F51426000A187AC /* HomeKit AutomatorTests */,
 				3DC6BB4D2F51426000A187AC /* HomeKit AutomatorUITests */,
 				3DC6BB322F51425F00A187AC /* Products */,
+				3DC6BB612F5142FC00A187AC /* App */,
+				3DC6BB682F51430400A187AC /* Automation */,
+				3DC6BB6D2F51431000A187AC /* Config */,
+				3DC6BB712F51431600A187AC /* HomeKit */,
+				3DC6BB732F51431C00A187AC /* HomeKitAutomator */,
+				3DC6BB772F51432100A187AC /* HomeKitCore */,
+				3DC6BB7D2F51432700A187AC /* Views */,
+				3DC6BB812F51432D00A187AC /* Products */,
 			);
 			sourceTree = "<group>";
 		};
@@ -88,6 +127,78 @@
 				3DC6BB312F51425F00A187AC /* HomeKit Automator.app */,
 				3DC6BB402F51426000A187AC /* HomeKit AutomatorTests.xctest */,
 				3DC6BB4A2F51426000A187AC /* HomeKit AutomatorUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3DC6BB612F5142FC00A187AC /* App */ = {
+			isa = PBXGroup;
+			children = (
+				3DC6BB5D2F5142FC00A187AC /* AppDelegate.swift */,
+				3DC6BB5E2F5142FC00A187AC /* AutomationStore.swift */,
+				3DC6BB5F2F5142FC00A187AC /* HomeKitAutomatorApp.swift */,
+				3DC6BB602F5142FC00A187AC /* AutomationModels.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		3DC6BB682F51430400A187AC /* Automation */ = {
+			isa = PBXGroup;
+			children = (
+				3DC6BB662F51430400A187AC /* AutomationListItem.swift */,
+				3DC6BB672F51430400A187AC /* LogEntryRow.swift */,
+			);
+			path = Automation;
+			sourceTree = "<group>";
+		};
+		3DC6BB6D2F51431000A187AC /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				3DC6BB6B2F51431000A187AC /* AppSettings.swift */,
+				3DC6BB6C2F51431000A187AC /* SettingsView.swift */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		3DC6BB712F51431600A187AC /* HomeKit */ = {
+			isa = PBXGroup;
+			children = (
+				3DC6BB702F51431600A187AC /* HelperManager.swift */,
+			);
+			path = HomeKit;
+			sourceTree = "<group>";
+		};
+		3DC6BB732F51431C00A187AC /* HomeKitAutomator */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = HomeKitAutomator;
+			path = ../scripts/swift/Sources/HomeKitAutomator;
+			sourceTree = "<group>";
+		};
+		3DC6BB772F51432100A187AC /* HomeKitCore */ = {
+			isa = PBXGroup;
+			children = (
+				3DC6BB742F51432100A187AC /* AnyCodableValue.swift */,
+				3DC6BB762F51432100A187AC /* SocketConstants.swift */,
+			);
+			name = HomeKitCore;
+			path = ../scripts/swift/Sources/HomeKitCore;
+			sourceTree = "<group>";
+		};
+		3DC6BB7D2F51432700A187AC /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				3DC6BB7B2F51432700A187AC /* DashboardView.swift */,
+				3DC6BB7C2F51432700A187AC /* HistoryView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		3DC6BB812F51432D00A187AC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3DC6BB802F51432D00A187AC /* HomeKit Automator.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -212,6 +323,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3DC6BB822F51432D00A187AC /* HomeKit Automator.app in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,6 +348,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3DC6BB622F5142FC00A187AC /* AutomationStore.swift in Sources */,
+				3DC6BB632F5142FC00A187AC /* AppDelegate.swift in Sources */,
+				3DC6BB642F5142FC00A187AC /* AutomationModels.swift in Sources */,
+				3DC6BB652F5142FC00A187AC /* HomeKitAutomatorApp.swift in Sources */,
+				3DC6BB692F51430400A187AC /* AutomationListItem.swift in Sources */,
+				3DC6BB6A2F51430400A187AC /* LogEntryRow.swift in Sources */,
+				3DC6BB722F51431600A187AC /* HelperManager.swift in Sources */,
+				3DC6BB7E2F51432700A187AC /* HistoryView.swift in Sources */,
+				3DC6BB7F2F51432700A187AC /* DashboardView.swift in Sources */,
+				3DC6BB6E2F51431000A187AC /* SettingsView.swift in Sources */,
+				3DC6BB782F51432100A187AC /* AnyCodableValue.swift in Sources */,
+				3DC6BB792F51432100A187AC /* SocketConstants.swift in Sources */,
+				3DC6BB6F2F51431000A187AC /* AppSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
