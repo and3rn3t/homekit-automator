@@ -12,7 +12,7 @@ struct ContentView: View {
     @State private var isLoading = false
     @State private var showingCreateSheet = false
     @State private var selectedAutomation: RegisteredAutomation?
-    
+
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedAutomation) {
@@ -28,6 +28,7 @@ struct ContentView: View {
                         Button("Create Automation") {
                             createAutomation()
                         }
+                        .accessibilityIdentifier(AccessibilityID.Content.emptyCreateButton)
                     }
                 } else {
                     ForEach(store.automations) { automation in
@@ -38,6 +39,7 @@ struct ContentView: View {
                     .onDelete(perform: deleteAutomations)
                 }
             }
+            .accessibilityIdentifier(AccessibilityID.Content.sidebar)
             .navigationTitle("Automations")
             .navigationSplitViewColumnWidth(min: 250, ideal: 300)
             .toolbar {
@@ -45,13 +47,15 @@ struct ContentView: View {
                     Button(action: createAutomation) {
                         Label("Create Automation", systemImage: "plus")
                     }
+                    .accessibilityIdentifier(AccessibilityID.Content.createButton)
                 }
-                
+
                 ToolbarItem(placement: .automatic) {
                     Button(action: refreshAutomations) {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
                     .disabled(isLoading)
+                    .accessibilityIdentifier(AccessibilityID.Content.refreshButton)
                 }
             }
         } detail: {
@@ -63,6 +67,7 @@ struct ContentView: View {
                 } description: {
                     Text("Choose an automation from the sidebar to view details")
                 }
+                .accessibilityIdentifier(AccessibilityID.Content.detailPlaceholder)
             }
         }
         .sheet(isPresented: $showingCreateSheet) {
@@ -74,28 +79,28 @@ struct ContentView: View {
             await loadAutomations()
         }
     }
-    
+
     private func loadAutomations() async {
         isLoading = true
         defer { isLoading = false }
-        
+
         // Small delay for UI feedback
         try? await Task.sleep(for: .seconds(0.3))
-        
+
         // Reload from disk
         store.reload()
     }
-    
+
     private func refreshAutomations() {
         Task {
             await loadAutomations()
         }
     }
-    
+
     private func createAutomation() {
         showingCreateSheet = true
     }
-    
+
     private func deleteAutomations(at offsets: IndexSet) {
         for index in offsets {
             let automation = store.automations[index]
@@ -112,15 +117,15 @@ struct ContentView: View {
 
 struct AutomationRowView: View {
     let automation: RegisteredAutomation
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(automation.name)
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 if automation.enabled {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
@@ -131,14 +136,14 @@ struct AutomationRowView: View {
                         .imageScale(.small)
                 }
             }
-            
+
             if let description = automation.description {
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
-            
+
             Text(automation.trigger.humanReadable)
                 .font(.caption)
                 .foregroundStyle(.blue)
@@ -155,38 +160,42 @@ struct AutomationDetailView: View {
     @State private var showingDeleteAlert = false
     @State private var isTriggeringManually = false
     @State private var errorMessage: String?
-    
+
     var body: some View {
         Form {
             Section("General") {
                 LabeledContent("Name", value: automation.name)
-                
+
                 if let description = automation.description {
                     LabeledContent("Description") {
                         Text(description)
                             .foregroundStyle(.secondary)
                     }
                 }
-                
+
                 LabeledContent("Status") {
                     HStack {
                         Text(automation.enabled ? "Enabled" : "Disabled")
                             .foregroundStyle(automation.enabled ? .green : .secondary)
-                        
+
                         Spacer()
-                        
-                        Toggle("", isOn: Binding(
-                            get: { automation.enabled },
-                            set: { _ in store.toggleEnabled(automation.id) }
-                        ))
+
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { automation.enabled },
+                                set: { _ in store.toggleEnabled(automation.id) }
+                            )
+                        )
                         .toggleStyle(.switch)
                         .labelsHidden()
+                        .accessibilityIdentifier(AccessibilityID.Detail.enableToggle)
                     }
                 }
-                
+
                 LabeledContent("Shortcut", value: automation.shortcutName)
             }
-            
+
             Section("Trigger") {
                 LabeledContent("Type", value: automation.trigger.type)
                 LabeledContent("Description") {
@@ -194,20 +203,20 @@ struct AutomationDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             Section("Actions") {
                 ForEach(Array(automation.actions.enumerated()), id: \.offset) { index, action in
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Action \(index + 1)")
                             .font(.headline)
-                        
+
                         Text(action.deviceName)
                             .font(.subheadline)
-                        
+
                         Text("\(action.characteristic): \(action.value.displayString)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        
+
                         if action.delaySeconds > 0 {
                             Text("Delay: \(action.delaySeconds)s")
                                 .font(.caption2)
@@ -217,14 +226,14 @@ struct AutomationDetailView: View {
                     .padding(.vertical, 4)
                 }
             }
-            
+
             if let conditions = automation.conditions, !conditions.isEmpty {
                 Section("Conditions") {
                     ForEach(Array(conditions.enumerated()), id: \.offset) { index, condition in
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Condition \(index + 1)")
                                 .font(.headline)
-                            
+
                             Text(condition.humanReadable)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -233,14 +242,14 @@ struct AutomationDetailView: View {
                     }
                 }
             }
-            
+
             Section("History") {
                 LabeledContent("Created") {
                     Text(automation.createdAt)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
+
                 if let lastRun = automation.lastRun {
                     LabeledContent("Last Run") {
                         Text(lastRun)
@@ -248,15 +257,18 @@ struct AutomationDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                
+
                 let successRate = store.successRate(for: automation.id)
                 LabeledContent("Success Rate") {
                     Text(String(format: "%.0f%%", successRate))
                         .font(.caption)
-                        .foregroundStyle(successRate >= 90 ? .green : (successRate >= 50 ? .orange : .red))
+                        .foregroundStyle(
+                            successRate >= 90 ? .green : (successRate >= 50 ? .orange : .red)
+                        )
+                        .accessibilityIdentifier(AccessibilityID.Detail.successRate)
                 }
             }
-            
+
             Section {
                 Button(action: triggerManually) {
                     if isTriggeringManually {
@@ -268,22 +280,25 @@ struct AutomationDetailView: View {
                     }
                 }
                 .disabled(isTriggeringManually)
-                
+                .accessibilityIdentifier(AccessibilityID.Detail.runNowButton)
+
                 Button(role: .destructive, action: { showingDeleteAlert = true }) {
                     Label("Delete Automation", systemImage: "trash")
                 }
-                
+                .accessibilityIdentifier(AccessibilityID.Detail.deleteButton)
+
                 if let error = errorMessage {
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.red)
+                        .accessibilityIdentifier(AccessibilityID.Detail.errorMessage)
                 }
             }
         }
         .formStyle(.grouped)
         .navigationTitle(automation.name)
         .alert("Delete Automation", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
                 store.delete(automation.id)
             }
@@ -291,13 +306,13 @@ struct AutomationDetailView: View {
             Text("Are you sure you want to delete \"\(automation.name)\"? This cannot be undone.")
         }
     }
-    
+
     private func triggerManually() {
         Task {
             isTriggeringManually = true
             errorMessage = nil
             defer { isTriggeringManually = false }
-            
+
             do {
                 try await HelperAPIClient.shared.triggerAutomation(automation.id)
                 // Give it a moment to execute
@@ -316,7 +331,7 @@ struct AutomationDetailView: View {
 }
 #Preview("Automation Detail") {
     let store = AutomationStore()
-    
+
     NavigationStack {
         AutomationDetailView(
             automation: RegisteredAutomation(
@@ -343,4 +358,3 @@ struct AutomationDetailView: View {
         )
     }
 }
-

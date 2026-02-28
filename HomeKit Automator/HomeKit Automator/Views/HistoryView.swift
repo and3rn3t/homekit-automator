@@ -7,7 +7,8 @@ struct HistoryView: View {
     @State private var store = AutomationStore()
     @State private var searchText = ""
     @State private var statusFilter: StatusFilter = .all
-    @State private var startDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    @State private var startDate: Date =
+        Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var endDate: Date = Date()
     @State private var sortOrder: SortOrder = .newestFirst
 
@@ -18,6 +19,7 @@ struct HistoryView: View {
                 Text("Execution History")
                     .font(.title2)
                     .fontWeight(.semibold)
+                    .accessibilityIdentifier(AccessibilityID.History.title)
 
                 Spacer()
 
@@ -25,6 +27,7 @@ struct HistoryView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .help("Refresh from disk")
+                .accessibilityIdentifier(AccessibilityID.History.refreshButton)
             }
             .padding()
 
@@ -44,6 +47,7 @@ struct HistoryView: View {
             // Content
             if filteredEntries.isEmpty {
                 emptyStateView
+                    .accessibilityIdentifier(AccessibilityID.History.emptyState)
             } else {
                 List {
                     ForEach(filteredEntries) { entry in
@@ -51,6 +55,7 @@ struct HistoryView: View {
                     }
                 }
                 .listStyle(.inset)
+                .accessibilityIdentifier(AccessibilityID.History.entryList)
             }
         }
         .frame(minWidth: 500, minHeight: 400)
@@ -66,6 +71,7 @@ struct HistoryView: View {
                     .foregroundStyle(.secondary)
                 TextField("Filter by name…", text: $searchText)
                     .textFieldStyle(.plain)
+                    .accessibilityIdentifier(AccessibilityID.History.searchField)
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -84,6 +90,7 @@ struct HistoryView: View {
             }
             .pickerStyle(.segmented)
             .frame(maxWidth: 200)
+            .accessibilityIdentifier(AccessibilityID.History.statusFilter)
 
             Spacer()
 
@@ -91,6 +98,7 @@ struct HistoryView: View {
             DatePicker("From", selection: $startDate, displayedComponents: .date)
                 .labelsHidden()
                 .frame(maxWidth: 120)
+                .accessibilityIdentifier(AccessibilityID.History.startDatePicker)
 
             Text("–")
                 .foregroundStyle(.secondary)
@@ -98,12 +106,14 @@ struct HistoryView: View {
             DatePicker("To", selection: $endDate, displayedComponents: .date)
                 .labelsHidden()
                 .frame(maxWidth: 120)
+                .accessibilityIdentifier(AccessibilityID.History.endDatePicker)
 
             // Sort order
             Button(action: { sortOrder.toggle() }) {
                 Image(systemName: sortOrder == .newestFirst ? "arrow.down" : "arrow.up")
             }
             .help(sortOrder == .newestFirst ? "Newest first" : "Oldest first")
+            .accessibilityIdentifier(AccessibilityID.History.sortButton)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -119,8 +129,9 @@ struct HistoryView: View {
 
             let successCount = filteredEntries.filter(\.isSuccess).count
             let failCount = filteredEntries.count - successCount
-            let rate = filteredEntries.isEmpty ? 100.0 :
-                Double(successCount) / Double(filteredEntries.count) * 100.0
+            let rate =
+                filteredEntries.isEmpty
+                ? 100.0 : Double(successCount) / Double(filteredEntries.count) * 100.0
 
             Label("\(successCount) succeeded", systemImage: "checkmark.circle")
                 .font(.caption)
@@ -141,6 +152,7 @@ struct HistoryView: View {
         .padding(.horizontal)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
+        .accessibilityIdentifier(AccessibilityID.History.summaryBar)
     }
 
     // MARK: - Empty State

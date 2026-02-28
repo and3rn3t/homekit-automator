@@ -16,6 +16,7 @@ struct DashboardView: View {
                 Text("Automations")
                     .font(.title2)
                     .fontWeight(.semibold)
+                    .accessibilityIdentifier(AccessibilityID.Dashboard.title)
 
                 Spacer()
 
@@ -23,6 +24,7 @@ struct DashboardView: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .help("Refresh from disk")
+                .accessibilityIdentifier(AccessibilityID.Dashboard.refreshButton)
             }
             .padding()
 
@@ -34,6 +36,7 @@ struct DashboardView: View {
                     .foregroundStyle(.secondary)
                 TextField("Search automations…", text: $searchText)
                     .textFieldStyle(.plain)
+                    .accessibilityIdentifier(AccessibilityID.Dashboard.searchField)
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -50,6 +53,7 @@ struct DashboardView: View {
             // Content
             if filteredAutomations.isEmpty {
                 emptyStateView
+                    .accessibilityIdentifier(AccessibilityID.Dashboard.emptyState)
             } else {
                 List {
                     ForEach(filteredAutomations) { automation in
@@ -63,6 +67,7 @@ struct DashboardView: View {
                     }
                 }
                 .listStyle(.inset)
+                .accessibilityIdentifier(AccessibilityID.Dashboard.automationList)
             }
 
             // Error bar
@@ -78,15 +83,18 @@ struct DashboardView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 6)
                 .background(.red.opacity(0.1))
+                .accessibilityIdentifier(AccessibilityID.Dashboard.errorBar)
             }
         }
         .frame(minWidth: 500, minHeight: 300)
-        .alert("Delete Automation",
-               isPresented: Binding(
-                   get: { deleteConfirmation != nil },
-                   set: { if !$0 { deleteConfirmation = nil } }
-               ),
-               presenting: deleteConfirmation) { automation in
+        .alert(
+            "Delete Automation",
+            isPresented: Binding(
+                get: { deleteConfirmation != nil },
+                set: { if !$0 { deleteConfirmation = nil } }
+            ),
+            presenting: deleteConfirmation
+        ) { automation in
             Button("Delete", role: .destructive) {
                 store.delete(automation.id)
                 deleteConfirmation = nil
@@ -107,9 +115,9 @@ struct DashboardView: View {
         }
         let query = searchText.lowercased()
         return store.automations.filter {
-            $0.name.lowercased().contains(query) ||
-            ($0.description?.lowercased().contains(query) ?? false) ||
-            $0.trigger.type.lowercased().contains(query)
+            $0.name.lowercased().contains(query)
+                || ($0.description?.lowercased().contains(query) ?? false)
+                || $0.trigger.type.lowercased().contains(query)
         }
     }
 
@@ -125,10 +133,12 @@ struct DashboardView: View {
             Text("No Automations")
                 .font(.title3)
                 .fontWeight(.medium)
-            Text("Use the CLI or MCP tools to create automations.\nRun: homekitauto automation create --json '{…}'")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            Text(
+                "Use the CLI or MCP tools to create automations.\nRun: homekitauto automation create --json '{…}'"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
             Spacer()
         }
         .frame(maxWidth: .infinity)

@@ -55,18 +55,23 @@ struct AutomationListItem: View {
                 if !store_logEntries_empty {
                     Text(String(format: "%.0f%% success", successRate))
                         .font(.caption2)
-                        .foregroundStyle(successRate >= 90 ? .green : (successRate >= 50 ? .orange : .red))
+                        .foregroundStyle(
+                            successRate >= 90 ? .green : (successRate >= 50 ? .orange : .red))
                 }
             }
 
             // Enable/disable toggle
-            Toggle("", isOn: Binding(
-                get: { automation.enabled },
-                set: { _ in onToggle() }
-            ))
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { automation.enabled },
+                    set: { _ in onToggle() }
+                )
+            )
             .toggleStyle(.switch)
             .labelsHidden()
             .help(automation.enabled ? "Disable automation" : "Enable automation")
+            .accessibilityIdentifier(AccessibilityID.ListItem.toggle(automation.id))
 
             // Delete button
             Button(action: onDelete) {
@@ -75,8 +80,10 @@ struct AutomationListItem: View {
             }
             .buttonStyle(.plain)
             .help("Delete automation")
+            .accessibilityIdentifier(AccessibilityID.ListItem.deleteButton(automation.id))
         }
         .padding(.vertical, 4)
+        .accessibilityIdentifier(AccessibilityID.ListItem.row(automation.id))
     }
 
     // MARK: - Subviews

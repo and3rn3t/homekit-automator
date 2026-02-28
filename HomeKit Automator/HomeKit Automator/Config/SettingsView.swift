@@ -10,7 +10,7 @@ struct SettingsView: View {
                 .tabItem {
                     Label("General", systemImage: "gear")
                 }
-            
+
             LLMSettingsTab()
                 .tabItem {
                     Label("LLM", systemImage: "brain")
@@ -22,6 +22,7 @@ struct SettingsView: View {
                 }
         }
         .frame(width: 550, height: 400)
+        .accessibilityIdentifier(AccessibilityID.Settings.tabView)
     }
 }
 
@@ -42,6 +43,7 @@ struct GeneralSettingsTab: View {
             Section("Home") {
                 TextField("Default Home Name", text: $defaultHomeName, prompt: Text("My Home"))
                     .help("The default home used when commands don't specify one.")
+                    .accessibilityIdentifier(AccessibilityID.Settings.homeNameField)
             }
 
             Section("Display") {
@@ -51,6 +53,7 @@ struct GeneralSettingsTab: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .accessibilityIdentifier(AccessibilityID.Settings.temperaturePicker)
             }
 
             Section("Startup") {
@@ -59,6 +62,7 @@ struct GeneralSettingsTab: View {
                         AppDelegate.setLaunchAtLogin(newValue)
                     }
                     .help("Automatically start HomeKit Automator when you log in.")
+                    .accessibilityIdentifier(AccessibilityID.Settings.launchAtLoginToggle)
             }
         }
         .formStyle(.grouped)
@@ -71,44 +75,46 @@ struct GeneralSettingsTab: View {
 struct LLMSettingsTab: View {
     @AppStorage(AppSettingsKeys.llmEnabled)
     private var llmEnabled: Bool = AppSettingsDefaults.llmEnabled
-    
+
     @AppStorage(AppSettingsKeys.llmProvider)
     private var llmProvider: String = AppSettingsDefaults.llmProvider
-    
+
     /// API key stored in Keychain (not UserDefaults) for security.
     /// Loaded on appear and persisted on change via KeychainHelper.
-    @State private var llmAPIKey: String = KeychainHelper.read(forKey: AppSettingsKeys.llmAPIKey) ?? ""
-    
+    @State private var llmAPIKey: String =
+        KeychainHelper.read(forKey: AppSettingsKeys.llmAPIKey) ?? ""
+
     @AppStorage(AppSettingsKeys.llmModel)
     private var llmModel: String = AppSettingsDefaults.llmModel
-    
+
     @AppStorage(AppSettingsKeys.llmEndpoint)
     private var llmEndpoint: String = AppSettingsDefaults.llmEndpoint
-    
+
     @AppStorage(AppSettingsKeys.llmTimeout)
     private var llmTimeout: Int = AppSettingsDefaults.llmTimeout
-    
+
     @State private var isTestingConnection = false
     @State private var testResult: String?
     @State private var showAPIKey = false
-    
+
     private var selectedProvider: LLMProvider {
         LLMProvider(rawValue: llmProvider) ?? .openai
     }
-    
+
     var body: some View {
         Form {
             Section {
                 Toggle("Enable Natural Language Automation Creation", isOn: $llmEnabled)
                     .help("Allow creating automations using natural language descriptions")
-                
+                    .accessibilityIdentifier(AccessibilityID.Settings.llmEnabledToggle)
+
                 if !llmEnabled {
                     Text("Enable this to use AI-powered automation creation from natural language.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            
+
             if llmEnabled {
                 Section("Provider") {
                     Picker("LLM Provider", selection: $llmProvider) {
@@ -116,6 +122,7 @@ struct LLMSettingsTab: View {
                             Text(provider.displayName).tag(provider.rawValue)
                         }
                     }
+                    .accessibilityIdentifier(AccessibilityID.Settings.llmProviderPicker)
                     .onChange(of: llmProvider) { _, newValue in
                         // Update defaults when provider changes
                         if let provider = LLMProvider(rawValue: newValue) {
@@ -127,33 +134,36 @@ struct LLMSettingsTab: View {
                             }
                         }
                     }
-                    
+
                     Text(providerHelpText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                
+
                 Section("Authentication") {
                     HStack {
                         if showAPIKey {
-                            TextField("API Key", text: $llmAPIKey, prompt: Text("Enter your API key"))
+                            TextField(
+                                "API Key", text: $llmAPIKey, prompt: Text("Enter your API key"))
                         } else {
-                            SecureField("API Key", text: $llmAPIKey, prompt: Text("Enter your API key"))
+                            SecureField(
+                                "API Key", text: $llmAPIKey, prompt: Text("Enter your API key"))
                         }
-                        
+
                         Button(action: { showAPIKey.toggle() }) {
                             Image(systemName: showAPIKey ? "eye.slash" : "eye")
                         }
                         .buttonStyle(.plain)
                         .help(showAPIKey ? "Hide API key" : "Show API key")
+                        .accessibilityIdentifier(AccessibilityID.Settings.llmShowKeyToggle)
                     }
-                    
+
                     if llmAPIKey.isEmpty {
                         Text("⚠️ API key is required for LLM features to work")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
-                    
+
                     Link("Get API Key →", destination: apiKeyURL)
                         .font(.caption)
                 }
@@ -165,17 +175,25 @@ struct LLMSettingsTab: View {
                         try? KeychainHelper.save(newValue, forKey: AppSettingsKeys.llmAPIKey)
                     }
                 }
-                
+
                 Section("Configuration") {
                     TextField("Model", text: $llmModel, prompt: Text(selectedProvider.defaultModel))
                         .help("Leave empty to use provider default")
-                    
-                    TextField("Endpoint", text: $llmEndpoint, prompt: Text(selectedProvider.defaultEndpoint))
-                        .help("Leave empty to use provider default")
-                    
-                    Stepper("Timeout: \(llmTimeout) seconds", value: $llmTimeout, in: 10...120, step: 5)
-                        .help("Maximum time to wait for LLM response")
-                    
+                        .accessibilityIdentifier(AccessibilityID.Settings.llmModelField)
+
+                    TextField(
+                        "Endpoint", text: $llmEndpoint,
+                        prompt: Text(selectedProvider.defaultEndpoint)
+                    )
+                    .help("Leave empty to use provider default")
+                    .accessibilityIdentifier(AccessibilityID.Settings.llmEndpointField)
+
+                    Stepper(
+                        "Timeout: \(llmTimeout) seconds", value: $llmTimeout, in: 10...120, step: 5
+                    )
+                    .help("Maximum time to wait for LLM response")
+                    .accessibilityIdentifier(AccessibilityID.Settings.llmTimeoutStepper)
+
                     HStack {
                         Button("Reset to Defaults") {
                             llmModel = ""
@@ -183,9 +201,10 @@ struct LLMSettingsTab: View {
                             llmTimeout = AppSettingsDefaults.llmTimeout
                         }
                         .font(.caption)
-                        
+                        .accessibilityIdentifier(AccessibilityID.Settings.llmResetDefaultsButton)
+
                         Spacer()
-                        
+
                         Button(action: testConnection) {
                             if isTestingConnection {
                                 ProgressView()
@@ -196,12 +215,14 @@ struct LLMSettingsTab: View {
                             }
                         }
                         .disabled(llmAPIKey.isEmpty || isTestingConnection)
+                        .accessibilityIdentifier(AccessibilityID.Settings.llmTestConnectionButton)
                     }
-                    
+
                     if let result = testResult {
                         Text(result)
                             .font(.caption)
                             .foregroundStyle(result.contains("✓") ? .green : .red)
+                            .accessibilityIdentifier(AccessibilityID.Settings.llmTestResult)
                     }
                 }
             }
@@ -209,7 +230,7 @@ struct LLMSettingsTab: View {
         .formStyle(.grouped)
         .padding()
     }
-    
+
     private var providerHelpText: String {
         switch selectedProvider {
         case .openai:
@@ -220,7 +241,7 @@ struct LLMSettingsTab: View {
             return "Use a custom LLM endpoint (must be OpenAI-compatible API format)."
         }
     }
-    
+
     private var apiKeyURL: URL {
         switch selectedProvider {
         case .openai:
@@ -231,25 +252,25 @@ struct LLMSettingsTab: View {
             return URL(string: "https://example.com")!
         }
     }
-    
+
     private func testConnection() {
         Task {
             isTestingConnection = true
             testResult = nil
             defer { isTestingConnection = false }
-            
+
             do {
                 guard let service = await LLMService() else {
                     testResult = "✗ Configuration invalid"
                     return
                 }
-                
+
                 // Simple test prompt
                 let definition = try await service.parseAutomation(
                     from: "Turn on the test light",
                     deviceContext: nil
                 )
-                
+
                 if !definition.name.isEmpty && !definition.actions.isEmpty {
                     testResult = "✓ Connection successful!"
                 } else {
@@ -279,6 +300,7 @@ struct AdvancedSettingsTab: View {
             Section("Communication") {
                 TextField("Socket Path", text: $socketPath)
                     .help("Unix domain socket path for communicating with the HomeKitHelper.")
+                    .accessibilityIdentifier(AccessibilityID.Settings.socketPathField)
 
                 if socketPath != AppSettingsDefaults.socketPath {
                     Button("Reset to Default") {
@@ -289,17 +311,23 @@ struct AdvancedSettingsTab: View {
             }
 
             Section("Logging") {
-                Stepper("Log Retention: \(logRetentionDays) days",
-                        value: $logRetentionDays,
-                        in: 1...365)
-                    .help("Number of days to keep execution log entries.")
+                Stepper(
+                    "Log Retention: \(logRetentionDays) days",
+                    value: $logRetentionDays,
+                    in: 1...365
+                )
+                .help("Number of days to keep execution log entries.")
+                .accessibilityIdentifier(AccessibilityID.Settings.logRetentionStepper)
             }
 
             Section("Helper Process") {
-                Stepper("Max Restarts: \(maxHelperRestarts)",
-                        value: $maxHelperRestarts,
-                        in: 1...20)
-                    .help("Maximum number of automatic restarts within a 15-minute window.")
+                Stepper(
+                    "Max Restarts: \(maxHelperRestarts)",
+                    value: $maxHelperRestarts,
+                    in: 1...20
+                )
+                .help("Maximum number of automatic restarts within a 15-minute window.")
+                .accessibilityIdentifier(AccessibilityID.Settings.maxRestartsStepper)
             }
         }
         .formStyle(.grouped)
