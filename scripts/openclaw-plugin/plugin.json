@@ -34,7 +34,7 @@
   },
   "requirements": {
     "runtime": ["node>=20"],
-    "build": ["swift>=6.0", "xcodegen"],
+    "build": ["swift>=6.1", "xcodegen"],
     "system": ["macos>=14.0"],
     "entitlements": ["com.apple.developer.homekit"]
   },
