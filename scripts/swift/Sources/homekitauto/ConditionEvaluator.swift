@@ -30,17 +30,27 @@ import Foundation
 struct SolarCalculator {
     let latitude: Double
     let longitude: Double
+    /// The timezone used to convert UTC solar times to local hours.
+    /// Defaults to the system timezone. Override in tests or for remote locations.
+    let timeZone: TimeZone
+
+    init(latitude: Double, longitude: Double, timeZone: TimeZone = .current) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.timeZone = timeZone
+    }
 
     /// Calculate sunrise and sunset decimal hours for a given date.
     ///
-    /// The returned decimal hours represent local time adjusted for the system timezone.
-    /// Values may fall outside [0, 24) if the system timezone does not match the location.
+    /// The returned decimal hours represent local time adjusted for the configured timezone.
+    /// Values may fall outside [0, 24) if the timezone does not match the location.
     /// Use `calculate(for:)` for DateComponents with proper wrapping.
     ///
     /// - Parameter date: The date to calculate for (defaults to now).
     /// - Returns: A tuple of raw decimal hours for sunrise and sunset.
     func calculateRaw(for date: Date = Date()) -> (sunriseDecimal: Double, sunsetDecimal: Double) {
-        let calendar = Calendar.current
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
         let dayOfYear = Double(calendar.ordinality(of: .day, in: .year, for: date) ?? 1)
 
         // Solar declination (simplified)
@@ -58,7 +68,7 @@ struct SolarCalculator {
         let hourAngleDegrees = hourAngle * 180.0 / .pi
 
         // Solar noon (approximate, adjusted for longitude and timezone)
-        let timezone = Double(TimeZone.current.secondsFromGMT(for: date)) / 3600.0
+        let timezone = Double(timeZone.secondsFromGMT(for: date)) / 3600.0
         let solarNoon = 12.0 - longitude / 15.0 + timezone
 
         let sunriseDecimal = solarNoon - hourAngleDegrees / 15.0
@@ -90,7 +100,7 @@ struct SolarCalculator {
     /// Default location (San Francisco, CA) used as a fallback when the user has not
     /// configured their latitude/longitude. Users can set their coordinates via:
     ///   homekitauto config --set latitude 40.7128 --set longitude -74.0060
-    static let `default` = SolarCalculator(latitude: 37.7749, longitude: -122.4194)
+    static let `default` = SolarCalculator(latitude: 37.7749, longitude: -122.4194, timeZone: .current)
 }
 
 /// Evaluates automation conditions against live state and environment.
@@ -100,11 +110,15 @@ struct ConditionEvaluator {
     let latitude: Double
     /// Longitude for solar calculations (defaults to San Francisco).
     let longitude: Double
+    /// Timezone for solar calculations (defaults to system timezone).
+    let timeZone: TimeZone
 
     init(latitude: Double = SolarCalculator.default.latitude,
-         longitude: Double = SolarCalculator.default.longitude) {
+         longitude: Double = SolarCalculator.default.longitude,
+         timeZone: TimeZone = .current) {
         self.latitude = latitude
         self.longitude = longitude
+        self.timeZone = timeZone
     }
 
     // MARK: - Result Types
@@ -180,7 +194,8 @@ struct ConditionEvaluator {
     /// - Returns: SingleResult indicating pass/fail with an explanatory reason.
     func evaluateTimeRange(_ condition: AutomationCondition, at date: Date = Date()) -> SingleResult {
         let now = date
-        let calendar = Calendar.current
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
         let currentHour = calendar.component(.hour, from: now)
         let currentMinute = calendar.component(.minute, from: now)
         let currentMinutes = currentHour * 60 + currentMinute
@@ -365,7 +380,8 @@ struct ConditionEvaluator {
             )
         }
 
-        let calendar = Calendar.current
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
         // Calendar.component(.weekday) returns 1=Sunday, 2=Monday, ..., 7=Saturday
         // Convert to 0-based: 0=Sunday, 1=Monday, ..., 6=Saturday
         let todayWeekday = calendar.component(.weekday, from: date) - 1
@@ -406,12 +422,13 @@ struct ConditionEvaluator {
             )
         }
 
-        let calendar = Calendar.current
+        var calendar = Calendar.current
+        calendar.timeZone = timeZone
         let currentHour = calendar.component(.hour, from: date)
         let currentMinute = calendar.component(.minute, from: date)
         let currentMinutes = currentHour * 60 + currentMinute
 
-        let calculator = SolarCalculator(latitude: latitude, longitude: longitude)
+        let calculator = SolarCalculator(latitude: latitude, longitude: longitude, timeZone: timeZone)
         let solar = calculator.calculate(for: date)
 
         let sunriseMinutes = (solar.sunrise.hour ?? 6) * 60 + (solar.sunrise.minute ?? 30)

@@ -6,6 +6,13 @@ import XCTest
 
 final class ConditionEvaluatorTests: XCTestCase {
 
+    // MARK: - Constants
+
+    /// Fixed timezone for solar tests — matches the default San Francisco coordinates.
+    /// Using a fixed timezone ensures tests are deterministic regardless of CI runner locale.
+    // swiftlint:disable:next force_unwrapping
+    private let pacificTZ = TimeZone(identifier: "America/Los_Angeles")!
+
     // MARK: - Helpers
 
     /// Creates a time_range condition with the given after/before times (HH:MM).
@@ -59,9 +66,11 @@ final class ConditionEvaluatorTests: XCTestCase {
         )
     }
 
-    /// Creates a Date for a specific date and time in the current timezone.
+    /// Creates a Date for a specific date and time.
+    /// Defaults to `TimeZone.current`; solar tests should pass `pacificTZ` explicitly.
     private func makeDate(year: Int = 2026, month: Int = 6, day: Int = 21,
-                          hour: Int = 12, minute: Int = 0) -> Date {
+                          hour: Int = 12, minute: Int = 0,
+                          timeZone: TimeZone = .current) -> Date {
         var components = DateComponents()
         components.year = year
         components.month = month
@@ -69,7 +78,7 @@ final class ConditionEvaluatorTests: XCTestCase {
         components.hour = hour
         components.minute = minute
         components.second = 0
-        components.timeZone = TimeZone.current
+        components.timeZone = timeZone
         return Calendar.current.date(from: components)!
     }
 
@@ -357,21 +366,21 @@ final class ConditionEvaluatorTests: XCTestCase {
     // MARK: - Solar Condition Evaluation Tests
 
     func testSolarConditionAfterSunset() {
-        let evaluator = ConditionEvaluator()
+        let evaluator = ConditionEvaluator(timeZone: pacificTZ)
         let condition = makeSolarCondition(requirement: "after_sunset")
 
         // 23:00 should be after sunset at any reasonable latitude
-        let lateNight = makeDate(hour: 23, minute: 0)
+        let lateNight = makeDate(hour: 23, minute: 0, timeZone: pacificTZ)
         let result = evaluator.evaluateSolar(condition, at: lateNight)
         XCTAssertTrue(result.met, "23:00 should be after sunset")
     }
 
     func testSolarConditionBeforeSunrise() {
-        let evaluator = ConditionEvaluator()
+        let evaluator = ConditionEvaluator(timeZone: pacificTZ)
         let condition = makeSolarCondition(requirement: "before_sunrise")
 
         // 03:00 should be before sunrise at any reasonable latitude
-        let earlyMorning = makeDate(hour: 3, minute: 0)
+        let earlyMorning = makeDate(hour: 3, minute: 0, timeZone: pacificTZ)
         let result = evaluator.evaluateSolar(condition, at: earlyMorning)
         XCTAssertTrue(result.met, "03:00 should be before sunrise")
     }
@@ -396,10 +405,10 @@ final class ConditionEvaluatorTests: XCTestCase {
 
     func testSolarConditionUsesCalculatedTimes() {
         // Verify that solar conditions use dynamic times, not hardcoded 06:30/18:30
-        let evaluator = ConditionEvaluator(latitude: 37.7749, longitude: -122.4194)
+        let evaluator = ConditionEvaluator(latitude: 37.7749, longitude: -122.4194, timeZone: pacificTZ)
         let condition = makeSolarCondition(requirement: "after_sunrise")
 
-        let summerNoon = makeDate(year: 2026, month: 6, day: 21, hour: 12, minute: 0)
+        let summerNoon = makeDate(year: 2026, month: 6, day: 21, hour: 12, minute: 0, timeZone: pacificTZ)
         let result = evaluator.evaluateSolar(condition, at: summerNoon)
 
         XCTAssertTrue(result.met, "Noon should be after sunrise")
@@ -487,33 +496,33 @@ final class ConditionEvaluatorTests: XCTestCase {
     // MARK: - Solar Edge Cases
 
     func testSolarConditionBeforeSunsetAtNoon() {
-        let evaluator = ConditionEvaluator()
+        let evaluator = ConditionEvaluator(timeZone: pacificTZ)
         let condition = makeSolarCondition(requirement: "before_sunset")
-        let noon = makeDate(hour: 12, minute: 0)
+        let noon = makeDate(hour: 12, minute: 0, timeZone: pacificTZ)
         let result = evaluator.evaluateSolar(condition, at: noon)
         XCTAssertTrue(result.met, "Noon should be before sunset")
     }
 
     func testSolarConditionAfterSunriseAtNoon() {
-        let evaluator = ConditionEvaluator()
+        let evaluator = ConditionEvaluator(timeZone: pacificTZ)
         let condition = makeSolarCondition(requirement: "after_sunrise")
-        let noon = makeDate(hour: 12, minute: 0)
+        let noon = makeDate(hour: 12, minute: 0, timeZone: pacificTZ)
         let result = evaluator.evaluateSolar(condition, at: noon)
         XCTAssertTrue(result.met, "Noon should be after sunrise")
     }
 
     func testSolarConditionBeforeSunriseAtNoon() {
-        let evaluator = ConditionEvaluator()
+        let evaluator = ConditionEvaluator(timeZone: pacificTZ)
         let condition = makeSolarCondition(requirement: "before_sunrise")
-        let noon = makeDate(hour: 12, minute: 0)
+        let noon = makeDate(hour: 12, minute: 0, timeZone: pacificTZ)
         let result = evaluator.evaluateSolar(condition, at: noon)
         XCTAssertFalse(result.met, "Noon should NOT be before sunrise")
     }
 
     func testSolarConditionAfterSunsetAtNoon() {
-        let evaluator = ConditionEvaluator()
+        let evaluator = ConditionEvaluator(timeZone: pacificTZ)
         let condition = makeSolarCondition(requirement: "after_sunset")
-        let noon = makeDate(hour: 12, minute: 0)
+        let noon = makeDate(hour: 12, minute: 0, timeZone: pacificTZ)
         let result = evaluator.evaluateSolar(condition, at: noon)
         XCTAssertFalse(result.met, "Noon should NOT be after sunset")
     }
