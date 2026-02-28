@@ -48,7 +48,7 @@ Claude/OpenClaw ──MCP──> MCP Server (Node.js) ──CLI──> homekitau
 
 The separation into multiple processes exists because Apple restricts HomeKit access to apps with a specific entitlement — plain command-line tools can't access `HMHomeManager`. The Mac Catalyst helper satisfies Apple's requirements while running headlessly as a background service.
 
-For a detailed architecture walkthrough, see [references/architecture.md](references/architecture.md).
+For a detailed architecture walkthrough, see [docs/architecture.md](docs/architecture.md).
 
 ## Quick Start
 
@@ -98,7 +98,7 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-For detailed setup instructions, see [SETUP.md](SETUP.md).
+For detailed setup instructions, see [docs/setup.md](docs/setup.md).
 
 ## Usage Examples
 
@@ -205,7 +205,7 @@ All commands support `--json` for machine-readable output. Use `--home "Name"` t
 
 ## MCP Tools
 
-The MCP server exposes 11 tools for AI agents. See [references/mcp-tools.md](references/mcp-tools.md) for full specifications.
+The MCP server exposes 11 tools for AI agents. See [docs/mcp-tools.md](docs/mcp-tools.md) for full specifications.
 
 | Tool | Purpose |
 |------|---------|
@@ -225,20 +225,21 @@ The MCP server exposes 11 tools for AI agents. See [references/mcp-tools.md](ref
 
 ```
 homekit-automator/
-├── SKILL.md                          # OpenClaw skill definition (the AI instructions)
 ├── README.md                         # This file
-├── SETUP.md                          # Detailed installation guide
 ├── CONTRIBUTING.md                   # Development and contribution guide
 ├── CHANGELOG.md                      # Version history
 ├── LICENSE                           # MIT license
 │
-├── references/                       # Detailed reference documentation
+├── docs/                             # All project documentation
+│   ├── skill.md                      # OpenClaw skill definition (the AI instructions)
+│   ├── setup.md                      # Detailed installation guide
 │   ├── architecture.md               # System design and data flow
 │   ├── mcp-tools.md                  # MCP tool specifications
 │   ├── automation-schema.md          # Automation JSON schema
 │   ├── shortcuts-integration.md      # Apple Shortcuts bridging
 │   ├── device-categories.md          # Full HomeKit characteristic reference
-│   └── troubleshooting.md            # Common issues and solutions
+│   ├── troubleshooting.md            # Common issues and solutions
+│   └── xcode-notes/                  # Xcode build and project notes
 │
 ├── evals/                            # Skill evaluation test cases
 │   └── evals.json
@@ -306,7 +307,7 @@ homekit-automator/
 
 ## Supported Devices
 
-HomeKit Automator supports all standard HomeKit accessory categories. See [references/device-categories.md](references/device-categories.md) for the full list of controllable characteristics per device type.
+HomeKit Automator supports all standard HomeKit accessory categories. See [docs/device-categories.md](docs/device-categories.md) for the full list of controllable characteristics per device type.
 
 | Category | Key Characteristics |
 |----------|-------------------|

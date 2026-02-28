@@ -188,7 +188,7 @@ If you have multiple homes, make sure you're targeting the right home with `--ho
 **Cause:** The device doesn't have the requested characteristic. A lock doesn't support brightness.
 
 **Fix:** Check available characteristics with `homekitauto get "Device Name" --json` and use
-one that's listed. See `references/device-categories.md` for the full reference.
+one that's listed. See `device-categories.md` for the full reference.
 
 ### "Characteristic 'currentTemperature' is read-only. Use 'targetTemperature' instead."
 

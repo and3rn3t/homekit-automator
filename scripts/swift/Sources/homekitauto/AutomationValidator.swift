@@ -63,7 +63,7 @@ struct AutomationValidator {
     // MARK: - Known Device Categories & Characteristics
 
     /// Maps device categories to their supported writable characteristics.
-    /// Derived from references/device-categories.md.
+    /// Derived from docs/device-categories.md.
     static let categoryCharacteristics: [String: [String]] = [
         "light": ["power", "brightness", "hue", "saturation", "colorTemperature"],
         "thermostat": ["targetTemperature", "hvacMode", "targetHumidity"],
@@ -252,7 +252,7 @@ struct AutomationValidator {
     }
 
     /// Table mapping each characteristic to its validation spec.
-    /// Derived from references/device-categories.md.
+    /// Derived from docs/device-categories.md.
     private static let valueSpecs: [String: ValueSpec] = [
         "power": .boolean,
         "active": .boolean,

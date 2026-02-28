@@ -201,7 +201,7 @@ value ranges, cron parsing, and duplicate name check.
 | `enabled` | bool | no | Default: true |
 | `home` | string | no | Target a specific home by name |
 
-See `references/automation-schema.md` for the full trigger, condition, and action schemas.
+See `automation-schema.md` for the full trigger, condition, and action schemas.
 
 **Returns:**
 

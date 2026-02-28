@@ -125,7 +125,7 @@ Apple's requirements without displaying any UI.
 ## Data Flow: Creating an Automation
 
 1. User: "Every morning at 7am, turn on kitchen lights and set thermostat to 72"
-2. LLM parses intent using SKILL.md guidance -> structured automation JSON
+2. LLM parses intent using skill.md guidance -> structured automation JSON
 3. LLM calls `automation_create` MCP tool with the JSON
 4. MCP server invokes `homekitauto automation create --definition '{...}'`
 5. CLI sends `discover` to helper to validate devices exist

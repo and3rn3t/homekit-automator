@@ -20,8 +20,8 @@ class HomekitAutomator < Formula
     libexec.install "scripts/mcp-server/index.js" => "mcp-server.js"
     libexec.install "scripts/mcp-server/package.json"
 
-    # Install SKILL.md for OpenClaw
-    share.install "SKILL.md"
+    # Install skill.md for OpenClaw
+    share.install "docs/skill.md"
     share.install "scripts/openclaw-plugin/plugin.json"
   end
 

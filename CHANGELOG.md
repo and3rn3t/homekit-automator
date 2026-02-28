@@ -156,12 +156,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `plugin.json` manifest for ClawHub publishing
 - Platform requirement declarations (macOS 14+, Swift 6, Node 20+)
-- Skill definition (`SKILL.md`) with comprehensive LLM guidance for natural language parsing
+- Skill definition (`docs/skill.md`) with comprehensive LLM guidance for natural language parsing
 
 **Documentation**
 
 - Complete README with architecture overview, usage examples, and CLI reference
-- Detailed setup guide (SETUP.md) covering Apple Developer configuration, building, and integration
+- Detailed setup guide (docs/setup.md) covering Apple Developer configuration, building, and integration
 - Contributing guide (CONTRIBUTING.md) with development workflow and code conventions
 - Architecture reference with data flow diagrams
 - Full MCP tool specifications with parameter tables and example responses

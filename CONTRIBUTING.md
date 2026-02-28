@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This guide covers everything you ne
 
 ### Prerequisites
 
-Follow the [SETUP.md](SETUP.md) guide through the "Building from Source" section. In addition, for development you'll want:
+Follow the [docs/setup.md](docs/setup.md) guide through the "Building from Source" section. In addition, for development you'll want:
 
 - Xcode (for the Catalyst helper and debugging)
 - A HomeKit-compatible device (or the HomeKit Accessory Simulator from Xcode's developer tools)
@@ -23,7 +23,7 @@ The codebase is organized into three main components:
 | HomeKit Helper | `scripts/swift/Sources/HomeKitHelper/` | Swift 6.0 | XcodeGen + xcodebuild |
 | SwiftUI Menu Bar App | `scripts/swift/Sources/HomeKitAutomator/` | Swift 6.0 | XcodeGen + xcodebuild |
 | MCP Server | `scripts/mcp-server/` | JavaScript (ES modules) | Node.js |
-| Skill Definition | `SKILL.md` + `references/` | Markdown | N/A |
+| Skill Definition | `docs/skill.md` + `docs/` | Markdown | N/A |
 | Plugin Manifest | `scripts/openclaw-plugin/` | JSON | N/A |
 
 ### Fast Development Loop
@@ -165,9 +165,9 @@ case "your_tool_name":
 
 ### Step 4: Document It
 
-1. Add the tool to `references/mcp-tools.md` with full parameter and return documentation
+1. Add the tool to `docs/mcp-tools.md` with full parameter and return documentation
 2. Update the tool table in `README.md`
-3. Add guidance for when to use it in `SKILL.md` under "When to Use Each Tool"
+3. Add guidance for when to use it in `docs/skill.md` under "When to Use Each Tool"
 
 ### Step 5: Add a Test Case
 
@@ -190,7 +190,7 @@ In `HomeKitManager.swift`, add the new category to `categoryName(_:)`.
 
 ### Step 3: Update the Reference Documentation
 
-Add the new category and its characteristics to `references/device-categories.md`.
+Add the new category and its characteristics to `docs/device-categories.md`.
 
 ### Step 4: Update the Suggestion Engine
 
@@ -240,8 +240,8 @@ echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | node scripts
 
 1. Run `swift build` and verify no compiler warnings
 2. Run `swift test` and verify all tests pass
-3. If you changed the SKILL.md or MCP tools, test with an actual AI agent conversation
-4. Update relevant documentation (README, references, CHANGELOG)
+3. If you changed `docs/skill.md` or MCP tools, test with an actual AI agent conversation
+4. Update relevant documentation (README, docs/, CHANGELOG)
 
 ### Pull Request Process
 

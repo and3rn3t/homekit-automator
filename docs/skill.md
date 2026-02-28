@@ -37,10 +37,10 @@ MCP server, and an automation engine that registers schedules as Apple Shortcuts
 
 ## Quick Reference
 
-Read `references/architecture.md` for the full system architecture and design decisions.
-Read `references/mcp-tools.md` for detailed MCP tool specifications and parameters.
-Read `references/automation-schema.md` for the automation definition format.
-Read `references/shortcuts-integration.md` for how Apple Shortcuts bridging works.
+Read `docs/architecture.md` for the full system architecture and design decisions.
+Read `docs/mcp-tools.md` for detailed MCP tool specifications and parameters.
+Read `docs/automation-schema.md` for the automation definition format.
+Read `docs/shortcuts-integration.md` for how Apple Shortcuts bridging works.
 
 ## How This Skill Works
 
@@ -88,7 +88,7 @@ Use `automation_create` when the user wants something to happen automatically or
 Key signals: "every morning," "when I leave," "at sunset," "on weekdays," or "set up a routine."
 
 The LLM's job is to parse the user's intent into the automation schema (see
-`references/automation-schema.md`). Pass the structured JSON via the `--definition` flag
+`docs/automation-schema.md`). Pass the structured JSON via the `--definition` flag
 (not `--json`). The engine runs a full validation pipeline before accepting:
 - Device existence check (with Levenshtein fuzzy match for near-miss suggestions)
 - Characteristic support and writability verification
