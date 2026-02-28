@@ -1,53 +1,84 @@
 // SocketConstants.swift
-// Shared constants and token management for Unix domain socket communication
-// between HomeKit Automator and HomeKitHelper.
+// HomeKit Automator — This file should match HomeKitCore/SocketConstants.swift — do not edit independently.
+//
+// Single source of truth for socket path, token management, and config directory.
+// All targets (CLI, Helper, GUI) should use consistent socket/token logic
+// to avoid authentication failures between components.
 
 import Foundation
 
+/// Shared socket and authentication constants for all HomeKit Automator components.
+///
+/// Provides:
+/// - Socket path: `~/Library/Application Support/homekit-automator/homekitauto.sock`
+/// - Auth token: `~/Library/Application Support/homekit-automator/.auth_token`
+/// - Config directory: `~/Library/Application Support/homekit-automator/`
+///
+/// All paths use the macOS Application Support convention. The config directory
+/// is created on demand if it does not exist.
 enum SocketConstants: Sendable {
-    
-    // MARK: - Configuration
-    
-    /// Protocol version for socket communication
-    static let protocolVersion = "1.0"
-    
-    /// Default socket path in Application Support directory
-    nonisolated static var defaultPath: String {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first!
-        
+
+    /// The Application Support subdirectory for HomeKit Automator.
+    /// Created on demand if it does not exist. Returns nil only if the system
+    /// has no Application Support directory (practically impossible on macOS).
+    static var appSupportDir: URL? {
+        guard let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first else {
+            return nil
+        }
         let dir = appSupport.appendingPathComponent("homekit-automator")
-        
-        // Create directory if it doesn't exist
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        
+        return dir
+    }
+
+    /// Default socket path in user-scoped Application Support directory.
+    /// Returns a fallback path in /tmp if Application Support is unavailable.
+    static var defaultPath: String {
+        guard let dir = appSupportDir else {
+            return "/tmp/homekitauto.sock"
+        }
         return dir.appendingPathComponent("homekitauto.sock").path
     }
-    
-    // MARK: - Token Management
-    
-    private nonisolated(unsafe) static let tokenKey = "com.homekit-automator.socket-token"
-    private nonisolated(unsafe) static let keychainService = "homekit-automator"
-    
-    /// Retrieves or creates a secure authentication token for socket communication.
-    /// The token is stored in UserDefaults for simplicity (not sensitive data).
-    nonisolated static func getOrCreateToken() -> String {
-        // Check if token exists in UserDefaults
-        if let existingToken = UserDefaults.standard.string(forKey: tokenKey), !existingToken.isEmpty {
-            return existingToken
+
+    /// Path to the authentication token file.
+    static var tokenPath: String {
+        guard let dir = appSupportDir else {
+            return "/tmp/homekitauto.auth_token"
         }
-        
-        // Generate new token
-        let newToken = UUID().uuidString
-        UserDefaults.standard.set(newToken, forKey: tokenKey)
-        
-        return newToken
+        return dir.appendingPathComponent(".auth_token").path
     }
-    
-    /// Resets the authentication token (useful for troubleshooting)
-    nonisolated static func resetToken() {
-        UserDefaults.standard.removeObject(forKey: tokenKey)
+
+    /// Generate or read the shared authentication token.
+    ///
+    /// If a token file exists and is non-empty, returns its contents.
+    /// Otherwise, generates a new UUID token, writes it to disk with
+    /// mode 0600 (owner-only), and returns it.
+    static func getOrCreateToken() -> String {
+        let path = tokenPath
+        if let existing = try? String(contentsOfFile: path, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !existing.isEmpty {
+            return existing
+        }
+        let token = UUID().uuidString
+        try? token.write(toFile: path, atomically: true, encoding: .utf8)
+        // Set file permissions to owner-only (0600)
+        chmod(path, 0o600)
+        return token
     }
+
+    /// Validates an incoming request's token against the stored token.
+    static func validateToken(_ requestToken: String?) -> Bool {
+        guard let requestToken = requestToken, !requestToken.isEmpty else { return false }
+        let expected = getOrCreateToken()
+        return requestToken == expected
+    }
+
+    /// The legacy socket path that was used before the Application Support migration.
+    static let legacySocketPath = "/tmp/homekitauto.sock"
+
+    /// Protocol version for socket IPC. Incremented when the request/response
+    /// format changes in a backward-incompatible way.
+    static let protocolVersion = 1
 }

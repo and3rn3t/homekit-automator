@@ -240,14 +240,29 @@ homekit-automator/
 │   ├── device-categories.md          # Full HomeKit characteristic reference
 │   ├── troubleshooting.md            # Common issues and solutions
 │   └── xcode-notes/                  # Xcode build and project notes
+│       ├── ARCHITECTURE.md           # Xcode app architecture overview
+│       └── GETTING_STARTED.md        # Xcode setup and build fix guide
+│
+├── HomeKit Automator/                # SwiftUI menu bar app (separate Xcode project)
+│   └── HomeKit Automator/
+│       ├── App/                      # App entry point and delegates
+│       ├── Config/                   # Settings and preferences
+│       ├── HomeKit/                  # HelperManager (companion process control)
+│       ├── Models/                   # AutomationModels, SocketConstants (mirrors HomeKitCore)
+│       ├── Services/                 # HelperAPIClient, LLMService
+│       └── Views/                    # SwiftUI views (ContentView, Dashboard, History, etc.)
 │
 ├── evals/                            # Skill evaluation test cases
 │   └── evals.json
 │
 ├── scripts/
-│   ├── build.sh                      # Build script
+│   ├── build.sh                      # Full build orchestrator (CLI + Helper + MCP)
+│   ├── fix-xcode.sh                  # Xcode build error fix (clean DerivedData, check files)
+│   ├── sync-models.sh                # Verify/regenerate Xcode app models from canonical
+│   ├── update-formula.sh             # Update Homebrew formula for new releases
+│   ├── test-automation-flow.sh       # End-to-end automation test script
 │   │
-│   ├── swift/                        # Swift source code
+│   ├── swift/                        # Swift source code (SPM package)
 │   │   ├── Package.swift             # SPM manifest
 │   │   ├── Sources/
 │   │   │   ├── HomeKitCore/          # Shared library (models, socket constants)
@@ -258,13 +273,12 @@ homekit-automator/
 │   │   │   ├── homekitauto/          # CLI tool
 │   │   │   │   ├── main.swift
 │   │   │   │   ├── SocketClient.swift
-│   │   │   │   ├── AnyCodableValue.swift
-│   │   │   │   ├── Models.swift
 │   │   │   │   ├── AutomationRegistry.swift
 │   │   │   │   ├── AutomationValidator.swift
 │   │   │   │   ├── ConditionEvaluator.swift
 │   │   │   │   ├── ShortcutGenerator.swift
 │   │   │   │   ├── HomeAnalyzer.swift
+│   │   │   │   ├── JSONOutput.swift
 │   │   │   │   ├── Logger.swift
 │   │   │   │   └── Commands/
 │   │   │   │       ├── StatusCommand.swift
@@ -274,28 +288,17 @@ homekit-automator/
 │   │   │   │       ├── AutomationCommand.swift
 │   │   │   │       └── IntelligenceCommands.swift
 │   │   │   │
-│   │   │   ├── HomeKitAutomator/     # SwiftUI menu bar app
-│   │   │   │   ├── App/
-│   │   │   │   ├── Automation/
-│   │   │   │   ├── Config/
-│   │   │   │   ├── HomeKit/
-│   │   │   │   └── Views/
-│   │   │   │
-│   │   │   └── HomeKitHelper/        # Mac Catalyst helper
+│   │   │   └── HomeKitHelper/        # Mac Catalyst helper (built via XcodeGen, not SPM)
 │   │   │       ├── project.yml       # XcodeGen specification
 │   │   │       ├── Info.plist
 │   │   │       ├── HomeKitHelper.entitlements
 │   │   │       ├── AppDelegate.swift
 │   │   │       ├── HomeKitManager.swift
-│   │   │       └── HelperSocketServer.swift
+│   │   │       ├── HelperSocketServer.swift
+│   │   │       └── AnyCodableValue.swift  # Local mirror (can't import SPM HomeKitCore)
 │   │   │
 │   │   └── Tests/
-│   │       └── HomeKitAutomatorTests/
-│   │           ├── AutomationRegistryTests.swift
-│   │           ├── AutomationRegistryCRUDTests.swift
-│   │           ├── HomeAnalyzerTests.swift
-│   │           ├── ShortcutGeneratorTests.swift
-│   │           └── ValidationTests.swift
+│   │       └── HomeKitAutomatorTests/    # 13 test files, 315+ unit tests
 │   │
 │   ├── mcp-server/                   # Node.js MCP server
 │   │   ├── package.json
@@ -343,7 +346,7 @@ Configuration is stored at `~/Library/Application Support/homekit-automator/`:
 
 The project includes comprehensive test coverage:
 
-- **50 Swift unit tests** — Validation pipeline, registry CRUD, shortcut generation, home analysis
+- **315+ Swift unit tests** — Validation pipeline, registry CRUD, shortcut generation, home analysis, socket constants, condition evaluation, model properties
 - **14 MCP integration tests** — Server protocol, tool invocation, error handling
 - **24 evaluation test cases** — Skill quality measurement for natural language parsing
 

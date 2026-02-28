@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# sync-models.sh — Verifies that HomeKitAutomator/App/Models.swift stays in sync
-# with the canonical HomeKitCore/Models.swift + HomeKitCore/AnyCodableValue.swift.
+# sync-models.sh — Verifies that the Xcode app's AutomationModels.swift stays in
+# sync with the canonical HomeKitCore/Models.swift + HomeKitCore/AnyCodableValue.swift.
 #
 # Usage:
 #   ./scripts/sync-models.sh          # Check mode (CI) — exits 0 if in sync, 1 if diverged
-#   ./scripts/sync-models.sh --update # Regenerate App/Models.swift from canonical sources
+#   ./scripts/sync-models.sh --update # Regenerate AutomationModels.swift from canonical sources
 #
-# The check strips doc comments and 'public' access modifiers before comparing,
-# so only structural differences (types, properties, methods) are flagged.
+# The check strips doc comments, 'public' access modifiers, and Hashable conformance
+# before comparing, so only structural differences (types, properties, methods) are flagged.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CANONICAL="$REPO_ROOT/scripts/swift/Sources/HomeKitCore/Models.swift"
 CANONICAL_ACV="$REPO_ROOT/scripts/swift/Sources/HomeKitCore/AnyCodableValue.swift"
-COPY="$REPO_ROOT/scripts/swift/Sources/HomeKitAutomator/App/Models.swift"
+COPY="$REPO_ROOT/HomeKit Automator/HomeKit Automator/Models/AutomationModels.swift"
 
 # Strip doc comments (/// lines), multi-line /** */ blocks, blank lines after stripping,
 # 'public ' access modifiers, and normalize whitespace for comparison.
@@ -25,6 +25,7 @@ normalize() {
         -e '/^[[:space:]]*$/d'            \
         -e 's/public //g'                 \
         -e 's/nonisolated\(unsafe\) //g'  \
+        -e 's/, Hashable//g'              \
         -e '/^import /d'                  \
         -e 's/^[[:space:]]+//'            \
         -e 's/[[:space:]]+$//'            \

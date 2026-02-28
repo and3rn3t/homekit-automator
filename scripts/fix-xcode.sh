@@ -63,9 +63,8 @@ done
 
 # Broad search as backup
 while IFS= read -r -d '' f; do
-    # Skip canonical HomeKitCore/Models.swift and HomeKitAutomator/App/Models.swift
+    # Skip canonical HomeKitCore/Models.swift (SPM source — not a conflict)
     [[ "$f" == *"HomeKitCore/Models.swift" ]] && continue
-    [[ "$f" == *"HomeKitAutomator/App/Models.swift" ]] && continue
     # Deduplicate
     for c in "${CONFLICTS[@]:-}"; do [[ "$c" == "$f" ]] && continue 2; done
     CONFLICTS+=("$f")

@@ -14,20 +14,20 @@ HomeKit Automator is a **macOS menu bar application** that helps you manage Home
 
 ### Step 1: Fix Build Errors
 
-When you first open the project, you'll see errors about duplicate `Models.swift` files. Here's how to fix it:
+If you see errors about duplicate `Models.swift` files or `lstat: No such file or directory`, run the automated fix:
 
-1. **Delete the old `Models.swift` file:**
-   - In Xcode's Project Navigator (⌘1), find `Models.swift` in the "HomeKit Automator" target
-   - Right-click → **Delete** → **Move to Trash**
+```bash
+cd /path/to/homekit-automator
+./scripts/fix-xcode.sh
+```
 
-2. **Add the new `AutomationModels.swift` file:**
-   - The file has already been created for you
-   - In Xcode, right-click your project folder → **Add Files to "HomeKit Automator"**
-   - Select `AutomationModels.swift`
-   - ✅ Make sure "HomeKit Automator" target is checked
+This will remove conflicting files, verify required sources, clean DerivedData, and clear SPM caches. Then in Xcode:
 
-3. **Build the project** (⌘B):
-   - The build should now succeed! 🎉
+1. **File → Packages → Resolve Package Versions**
+2. **Product → Clean Build Folder** (⌘⇧K)
+3. **Product → Build** (⌘B) — the build should now succeed! 🎉
+
+> **Manual alternative:** If you prefer, delete the old `Models.swift` from the app target in Xcode (right-click → Delete → Move to Trash), ensure `AutomationModels.swift` is added to the target, then clean and build.
 
 ### Step 2: Update Your Info.plist (Optional)
 

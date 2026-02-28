@@ -42,7 +42,7 @@ public struct AutomationDefinition: Codable, Sendable {
 // MARK: - Registered Automation
 
 /// A fully validated and registered automation persisted in the local registry.
-public struct RegisteredAutomation: Codable, Identifiable, Sendable {
+public struct RegisteredAutomation: Codable, Identifiable, Sendable, Hashable {
     public var id: String
     public var name: String
     public var description: String?
@@ -71,12 +71,22 @@ public struct RegisteredAutomation: Codable, Identifiable, Sendable {
         self.createdAt = createdAt
         self.lastRun = lastRun
     }
+
+    // MARK: - Hashable
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    public static func == (lhs: RegisteredAutomation, rhs: RegisteredAutomation) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Trigger
 
 /// Defines when an automation fires.
-public struct AutomationTrigger: Codable, Sendable {
+public struct AutomationTrigger: Codable, Sendable, Hashable {
     public let type: String
     public let humanReadable: String
     public let cron: String?
@@ -117,7 +127,7 @@ public struct AutomationTrigger: Codable, Sendable {
 // MARK: - Condition
 
 /// Optional guard that must evaluate to true for an automation to execute.
-public struct AutomationCondition: Codable, Sendable {
+public struct AutomationCondition: Codable, Sendable, Hashable {
     public let type: String
     public let humanReadable: String
     public let after: String?
@@ -156,7 +166,7 @@ public struct AutomationCondition: Codable, Sendable {
 // MARK: - Action
 
 /// A single device control action within an automation.
-public struct AutomationAction: Codable, Sendable {
+public struct AutomationAction: Codable, Sendable, Hashable {
     public let type: String?
     public let deviceUuid: String
     public let deviceName: String

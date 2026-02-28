@@ -22,7 +22,7 @@ import Foundation
 ///
 /// Used throughout the socket protocol and command response handling where the exact structure of values cannot be
 /// determined statically, enabling flexible HomeKit automation across diverse accessory types.
-public enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
+public enum AnyCodableValue: Codable, Equatable, Hashable, Sendable, CustomStringConvertible {
     /// String value. Typically used for names, identifiers, modes (e.g., "heating", "cooling"),
     /// and other textual HomeKit characteristic values.
     case string(String)

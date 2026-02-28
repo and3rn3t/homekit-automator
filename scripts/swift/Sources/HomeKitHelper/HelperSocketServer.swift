@@ -3,7 +3,6 @@
 // and dispatches them to the HomeKitManager.
 
 import Foundation
-import HomeKitCore
 
 /// GCD-based Unix domain socket server for HomeKit command processing.
 ///

@@ -37,6 +37,12 @@ let package = Package(
         // Shared library — canonical AnyCodableValue and model types used by all targets.
         // HomeKitHelper and HomeKitAutomator (Xcode targets) mirror these sources;
         // the CLI and test targets import this module directly.
+        //
+        // NOTE: Sources/HomeKitHelper/ is intentionally NOT an SPM target.
+        // It is built separately via XcodeGen (see Sources/HomeKitHelper/project.yml)
+        // because it requires Mac Catalyst + HomeKit entitlement, which SPM cannot provide.
+        // HomeKitHelper maintains its own copies of AnyCodableValue and SocketConstants
+        // since it cannot import the SPM HomeKitCore module in the XcodeGen build.
         .target(
             name: "HomeKitCore",
             path: "Sources/HomeKitCore"
