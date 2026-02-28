@@ -24,6 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Migrate API key from UserDefaults (plaintext) to Keychain (encrypted) on first launch.
+        // Safe to call on every launch — no-op if already migrated.
+        KeychainHelper.migrateFromUserDefaults(
+            userDefaultsKey: AppSettingsKeys.llmAPIKey,
+            keychainKey: AppSettingsKeys.llmAPIKey
+        )
+        
         setupStatusBar()
         startHealthCheckTimer()
         // Launch helper on startup

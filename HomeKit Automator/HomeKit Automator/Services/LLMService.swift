@@ -26,12 +26,14 @@ final class LLMService {
         self.timeout = timeout
     }
     
-    /// Convenience initializer that reads from UserDefaults
+    /// Convenience initializer that reads provider/model/endpoint from UserDefaults
+    /// and the API key from the Keychain (secure storage).
     convenience init?() {
         let providerRaw = UserDefaults.standard.string(forKey: AppSettingsKeys.llmProvider) ?? AppSettingsDefaults.llmProvider
         guard let provider = LLMProvider(rawValue: providerRaw) else { return nil }
         
-        let apiKey = UserDefaults.standard.string(forKey: AppSettingsKeys.llmAPIKey) ?? AppSettingsDefaults.llmAPIKey
+        // Read API key from Keychain (secure) instead of UserDefaults (plaintext plist)
+        let apiKey = KeychainHelper.read(forKey: AppSettingsKeys.llmAPIKey) ?? ""
         guard !apiKey.isEmpty else { return nil }
         
         let model = UserDefaults.standard.string(forKey: AppSettingsKeys.llmModel) ?? AppSettingsDefaults.llmModel
@@ -199,7 +201,44 @@ final class LLMService {
     
     // MARK: - API Communication
     
+    /// Maximum number of retry attempts for transient failures (timeouts, rate limits, 5xx errors).
+    private static let maxRetries = 3
+    /// Initial backoff delay between retries (doubles each attempt).
+    private static let initialBackoffSeconds: TimeInterval = 1.0
+    
     private nonisolated func sendRequest(system: String, user: String) async throws -> String {
+        var lastError: Error?
+        
+        for attempt in 0..<Self.maxRetries {
+            do {
+                return try await performRequest(system: system, user: user)
+            } catch let error as LLMError {
+                lastError = error
+                // Only retry on transient failures
+                switch error {
+                case .apiError(let statusCode, _) where statusCode == 429 || (500...599).contains(statusCode):
+                    // Rate limit (429) or server error (5xx) — retry with exponential backoff
+                    let backoff = Self.initialBackoffSeconds * pow(2.0, Double(attempt))
+                    try await Task.sleep(for: .seconds(backoff))
+                    continue
+                default:
+                    throw error  // Non-retryable errors (400, 401, 403, parsing, etc.)
+                }
+            } catch let error as URLError where error.code == .timedOut || error.code == .networkConnectionLost {
+                // Network timeout or connection lost — retry
+                lastError = error
+                let backoff = Self.initialBackoffSeconds * pow(2.0, Double(attempt))
+                try await Task.sleep(for: .seconds(backoff))
+                continue
+            } catch {
+                throw error  // Unknown errors — don't retry
+            }
+        }
+        
+        throw lastError ?? LLMError.invalidResponse
+    }
+    
+    private nonisolated func performRequest(system: String, user: String) async throws -> String {
         guard let url = URL(string: endpoint) else {
             throw LLMError.invalidEndpoint
         }

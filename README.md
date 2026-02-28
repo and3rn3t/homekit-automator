@@ -30,7 +30,7 @@ The skill parses your intent, validates it against your actual devices, generate
 
 **Menu Bar App** — Native SwiftUI menu bar app with dashboard, settings, and history views for managing automations and monitoring helper process health.
 
-**Tested & CI** — 50 Swift unit tests, 14 MCP integration tests, 24 eval cases. GitHub Actions CI/CD pipeline for automated builds and tests.
+**Tested & CI** — 315+ Swift unit tests, 14 MCP integration tests, 24 eval cases. GitHub Actions CI/CD pipeline for automated builds and tests.
 
 ## Architecture Overview
 
@@ -205,21 +205,25 @@ All commands support `--json` for machine-readable output. Use `--home "Name"` t
 
 ## MCP Tools
 
-The MCP server exposes 11 tools for AI agents. See [docs/mcp-tools.md](docs/mcp-tools.md) for full specifications.
+The MCP server exposes 15 tools for AI agents. See [docs/mcp-tools.md](docs/mcp-tools.md) for full specifications.
 
 | Tool | Purpose |
-|------|---------|
+|------|----------|
 | `home_discover` | Discover all rooms, devices, scenes, and capabilities |
 | `device_status` | Get current state of a device or room |
 | `device_control` | Send an immediate control command |
+| `device_batch` | Control multiple devices in a single call |
 | `scene_trigger` | Activate an Apple Home scene |
 | `automation_create` | Create an automation and register it as a Shortcut |
 | `automation_list` | List all registered automations |
 | `automation_edit` | Modify an existing automation |
 | `automation_delete` | Remove an automation and its Shortcut |
 | `automation_test` | Dry-run an automation (evaluates conditions first) |
+| `automation_export` | Export automations to JSON for backup or sharing |
+| `automation_import` | Import automations from a JSON file |
 | `home_suggest` | Get intelligent automation suggestions (seasonal + pattern-based) |
 | `energy_summary` | Device usage, automation activity, and week-over-week history |
+| `home_config` | View or update home configuration (default home, filter mode) |
 
 ## Project Structure
 

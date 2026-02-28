@@ -75,8 +75,9 @@ struct LLMSettingsTab: View {
     @AppStorage(AppSettingsKeys.llmProvider)
     private var llmProvider: String = AppSettingsDefaults.llmProvider
     
-    @AppStorage(AppSettingsKeys.llmAPIKey)
-    private var llmAPIKey: String = AppSettingsDefaults.llmAPIKey
+    /// API key stored in Keychain (not UserDefaults) for security.
+    /// Loaded on appear and persisted on change via KeychainHelper.
+    @State private var llmAPIKey: String = KeychainHelper.read(forKey: AppSettingsKeys.llmAPIKey) ?? ""
     
     @AppStorage(AppSettingsKeys.llmModel)
     private var llmModel: String = AppSettingsDefaults.llmModel
@@ -155,6 +156,14 @@ struct LLMSettingsTab: View {
                     
                     Link("Get API Key →", destination: apiKeyURL)
                         .font(.caption)
+                }
+                .onChange(of: llmAPIKey) { _, newValue in
+                    // Persist API key to Keychain (secure) instead of UserDefaults
+                    if newValue.isEmpty {
+                        KeychainHelper.delete(forKey: AppSettingsKeys.llmAPIKey)
+                    } else {
+                        try? KeychainHelper.save(newValue, forKey: AppSettingsKeys.llmAPIKey)
+                    }
                 }
                 
                 Section("Configuration") {

@@ -373,13 +373,26 @@ class HelperSocketServer {
 
     /// Persists config to ~/Library/Application Support/homekit-automator/config.json with pretty printing.
     /// Creates parent directories if needed; uses atomic writes to prevent corruption.
+    /// Logs warnings on failure instead of silently swallowing errors.
     /// - Parameters:
     ///   - config: Configuration dictionary to persist
     private func saveConfig(_ config: [String: Any]) {
-        guard let data = try? JSONSerialization.data(withJSONObject: config, options: .prettyPrinted) else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: config, options: .prettyPrinted) else {
+            print("[SocketServer] WARNING: Could not serialize config to JSON")
+            return
+        }
         let dir = (configPath as NSString).deletingLastPathComponent
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        try? data.write(to: URL(fileURLWithPath: configPath), options: .atomic)
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[SocketServer] WARNING: Could not create config directory at \(dir): \(error.localizedDescription)")
+            return
+        }
+        do {
+            try data.write(to: URL(fileURLWithPath: configPath), options: .atomic)
+        } catch {
+            print("[SocketServer] WARNING: Could not write config to \(configPath): \(error.localizedDescription)")
+        }
     }
 }
 

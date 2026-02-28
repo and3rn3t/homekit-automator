@@ -52,7 +52,7 @@ HomeKit Automator is a two-process macOS application:
 
 On top of this foundation, the skill provides:
 
-- **MCP Server** (stdio) — 11 tools that Claude/OpenClaw can call for device control,
+- **MCP Server** (stdio) — 15 tools that Claude/OpenClaw can call for device control,
   automation management, and home intelligence
 - **Automation Engine** — Parses natural language intent (via the LLM) into structured
   automation definitions, validates them against discovered devices (with Levenshtein fuzzy

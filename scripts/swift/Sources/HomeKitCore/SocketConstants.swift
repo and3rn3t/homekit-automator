@@ -56,6 +56,7 @@ public enum SocketConstants {
     /// If a token file exists and is non-empty, returns its contents.
     /// Otherwise, generates a new UUID token, writes it to disk with
     /// mode 0600 (owner-only), and returns it.
+    /// Logs a warning if the token cannot be persisted to disk.
     public static func getOrCreateToken() -> String {
         let path = tokenPath
         if let existing = try? String(contentsOfFile: path, encoding: .utf8)
@@ -64,17 +65,33 @@ public enum SocketConstants {
             return existing
         }
         let token = UUID().uuidString
-        try? token.write(toFile: path, atomically: true, encoding: .utf8)
-        // Set file permissions to owner-only (0600)
-        chmod(path, 0o600)
+        do {
+            try token.write(toFile: path, atomically: true, encoding: .utf8)
+            // Set file permissions to owner-only (0600)
+            chmod(path, 0o600)
+        } catch {
+            // Token is usable for this session but won't persist across restarts.
+            // This can cause auth failures if the other component reads a different token.
+            print("[SocketConstants] WARNING: Could not persist auth token to \(path): \(error.localizedDescription)")
+        }
         return token
     }
 
     /// Validates an incoming request's token against the stored token.
+    /// Uses constant-time comparison to prevent timing side-channel attacks.
     public static func validateToken(_ requestToken: String?) -> Bool {
         guard let requestToken = requestToken, !requestToken.isEmpty else { return false }
         let expected = getOrCreateToken()
-        return requestToken == expected
+        // Constant-time comparison: always compare all bytes regardless of mismatch position.
+        // Prevents timing attacks where an attacker measures response time to deduce prefix matches.
+        let requestBytes = Array(requestToken.utf8)
+        let expectedBytes = Array(expected.utf8)
+        guard requestBytes.count == expectedBytes.count else { return false }
+        var result: UInt8 = 0
+        for (a, b) in zip(requestBytes, expectedBytes) {
+            result |= a ^ b
+        }
+        return result == 0
     }
 
     /// The legacy socket path that was used before the Application Support migration.
