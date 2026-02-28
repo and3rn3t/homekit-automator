@@ -6,10 +6,14 @@ import SwiftUI
 
 struct CreateAutomationView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppSettingsKeys.llmEnabled) private var llmEnabled: Bool = AppSettingsDefaults.llmEnabled
+    
     @State private var userPrompt = ""
     @State private var isCreating = false
     @State private var errorMessage: String?
     @State private var showSuccess = false
+    @State private var loadingDeviceContext = false
+    @State private var deviceContext: String?
     
     let onComplete: () -> Void
     
@@ -77,6 +81,25 @@ struct CreateAutomationView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 
+                if !llmEnabled {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundStyle(.blue)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LLM Integration Disabled")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Text("Enable natural language automation in Settings → LLM")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.blue.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                
                 Spacer()
                 
                 HStack {
@@ -86,6 +109,14 @@ struct CreateAutomationView: View {
                     .keyboardShortcut(.cancelAction)
                     
                     Spacer()
+                    
+                    if loadingDeviceContext {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading devices...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     
                     Button(action: createAutomation) {
                         if isCreating {
@@ -98,13 +129,16 @@ struct CreateAutomationView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(userPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating)
+                    .disabled(userPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isCreating || !llmEnabled)
                     .keyboardShortcut(.defaultAction)
                 }
             }
             .padding()
         }
-        .frame(width: 600, height: 400)
+        .frame(width: 600, height: 450)
+        .task {
+            await loadDeviceContext()
+        }
         .alert("Automation Created", isPresented: $showSuccess) {
             Button("OK") {
                 onComplete()
@@ -130,53 +164,55 @@ struct CreateAutomationView: View {
             defer { isCreating = false }
             
             do {
-                // This is a simplified version. In a real implementation, you would:
-                // 1. Send the user prompt to your LLM service
-                // 2. Parse the response into an AutomationDefinition
-                // 3. Send it to the helper via HelperAPIClient
+                // Check if LLM is enabled
+                guard llmEnabled else {
+                    errorMessage = "LLM integration is disabled. Enable it in Settings → LLM tab."
+                    return
+                }
                 
-                // For now, we'll show an error indicating this needs LLM integration
-                throw CreateAutomationError.notImplemented
+                // Create LLM service
+                guard let service = await LLMService() else {
+                    errorMessage = "LLM service not configured. Please set up your API key in Settings."
+                    return
+                }
                 
-                // Example of what the full implementation would look like:
-                // let definition = try await generateAutomationDefinition(from: userPrompt)
-                // let response = try await HelperAPIClient.shared.createAutomation(definition)
-                // if response.success {
-                //     showSuccess = true
-                // } else {
-                //     errorMessage = response.message ?? "Failed to create automation"
-                // }
+                // Parse automation using LLM
+                let definition = try await service.parseAutomation(
+                    from: userPrompt,
+                    deviceContext: deviceContext
+                )
                 
-            } catch CreateAutomationError.notImplemented {
-                errorMessage = """
-                Automation creation requires integration with an LLM service (OpenAI, Claude, etc.) \
-                to parse natural language into automation definitions.
+                // Send to helper to create automation
+                let response = try await HelperAPIClient.shared.createAutomation(definition)
                 
-                For now, please use the CLI tool:
-                homekitauto automation create --interactive
-                """
+                if response.success {
+                    showSuccess = true
+                } else {
+                    errorMessage = response.message ?? "Failed to create automation"
+                }
+                
+            } catch LLMError.notConfigured {
+                errorMessage = "Please configure your LLM API key in Settings → LLM tab"
+            } catch LLMError.apiError(let code, let message) {
+                errorMessage = "LLM API error (\(code)): \(message)"
+            } catch LLMError.parsingFailed(let details) {
+                errorMessage = "Failed to parse automation: \(details)"
             } catch {
                 errorMessage = "Failed to create automation: \(error.localizedDescription)"
             }
         }
     }
-}
-
-// MARK: - Errors
-
-enum CreateAutomationError: LocalizedError {
-    case notImplemented
-    case llmServiceUnavailable
-    case invalidResponse
     
-    var errorDescription: String? {
-        switch self {
-        case .notImplemented:
-            return "LLM integration not implemented"
-        case .llmServiceUnavailable:
-            return "LLM service is unavailable"
-        case .invalidResponse:
-            return "Invalid response from LLM service"
+    private func loadDeviceContext() async {
+        loadingDeviceContext = true
+        defer { loadingDeviceContext = false }
+        
+        do {
+            deviceContext = try await LLMService.fetchDeviceContext()
+        } catch {
+            // Non-fatal: Continue without device context
+            print("Could not load device context: \(error)")
+            deviceContext = nil
         }
     }
 }

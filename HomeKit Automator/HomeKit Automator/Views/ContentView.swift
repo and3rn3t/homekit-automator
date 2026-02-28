@@ -8,17 +8,18 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var automations: [RegisteredAutomation] = []
+    @State private var store = AutomationStore()
     @State private var isLoading = false
-    @State private var errorMessage: String?
+    @State private var showingCreateSheet = false
+    @State private var selectedAutomation: RegisteredAutomation?
     
     var body: some View {
         NavigationSplitView {
-            List {
+            List(selection: $selectedAutomation) {
                 if isLoading {
                     ProgressView("Loading automations...")
                         .frame(maxWidth: .infinity, alignment: .center)
-                } else if automations.isEmpty {
+                } else if store.automations.isEmpty {
                     ContentUnavailableView {
                         Label("No Automations", systemImage: "sparkles")
                     } description: {
@@ -29,13 +30,12 @@ struct ContentView: View {
                         }
                     }
                 } else {
-                    ForEach(automations) { automation in
-                        NavigationLink {
-                            AutomationDetailView(automation: automation)
-                        } label: {
+                    ForEach(store.automations) { automation in
+                        NavigationLink(value: automation) {
                             AutomationRowView(automation: automation)
                         }
                     }
+                    .onDelete(perform: deleteAutomations)
                 }
             }
             .navigationTitle("Automations")
@@ -55,10 +55,19 @@ struct ContentView: View {
                 }
             }
         } detail: {
-            ContentUnavailableView {
-                Label("Select an Automation", systemImage: "slider.horizontal.3")
-            } description: {
-                Text("Choose an automation from the sidebar to view details")
+            if let automation = selectedAutomation {
+                AutomationDetailView(automation: automation, store: store)
+            } else {
+                ContentUnavailableView {
+                    Label("Select an Automation", systemImage: "slider.horizontal.3")
+                } description: {
+                    Text("Choose an automation from the sidebar to view details")
+                }
+            }
+        }
+        .sheet(isPresented: $showingCreateSheet) {
+            CreateAutomationView {
+                store.reload()
             }
         }
         .task {
@@ -70,10 +79,11 @@ struct ContentView: View {
         isLoading = true
         defer { isLoading = false }
         
-        // TODO: Load automations from your HomeKit helper
-        // For now, this is a placeholder
-        try? await Task.sleep(for: .seconds(0.5))
-        automations = []
+        // Small delay for UI feedback
+        try? await Task.sleep(for: .seconds(0.3))
+        
+        // Reload from disk
+        store.reload()
     }
     
     private func refreshAutomations() {
@@ -83,8 +93,18 @@ struct ContentView: View {
     }
     
     private func createAutomation() {
-        // TODO: Implement automation creation flow
-        print("Create automation tapped")
+        showingCreateSheet = true
+    }
+    
+    private func deleteAutomations(at offsets: IndexSet) {
+        for index in offsets {
+            let automation = store.automations[index]
+            // Clear selection if we're deleting the selected item
+            if selectedAutomation?.id == automation.id {
+                selectedAutomation = nil
+            }
+            store.delete(automation.id)
+        }
     }
 }
 
@@ -131,6 +151,10 @@ struct AutomationRowView: View {
 
 struct AutomationDetailView: View {
     let automation: RegisteredAutomation
+    @Bindable var store: AutomationStore  // Use shared store instead of creating new one
+    @State private var showingDeleteAlert = false
+    @State private var isTriggeringManually = false
+    @State private var errorMessage: String?
     
     var body: some View {
         Form {
@@ -145,8 +169,19 @@ struct AutomationDetailView: View {
                 }
                 
                 LabeledContent("Status") {
-                    Text(automation.enabled ? "Enabled" : "Disabled")
-                        .foregroundStyle(automation.enabled ? .green : .secondary)
+                    HStack {
+                        Text(automation.enabled ? "Enabled" : "Disabled")
+                            .foregroundStyle(automation.enabled ? .green : .secondary)
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: Binding(
+                            get: { automation.enabled },
+                            set: { _ in store.toggleEnabled(automation.id) }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                    }
                 }
                 
                 LabeledContent("Shortcut", value: automation.shortcutName)
@@ -213,10 +248,66 @@ struct AutomationDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                
+                let successRate = store.successRate(for: automation.id)
+                LabeledContent("Success Rate") {
+                    Text(String(format: "%.0f%%", successRate))
+                        .font(.caption)
+                        .foregroundStyle(successRate >= 90 ? .green : (successRate >= 50 ? .orange : .red))
+                }
+            }
+            
+            Section {
+                Button(action: triggerManually) {
+                    if isTriggeringManually {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Running...")
+                    } else {
+                        Label("Run Now", systemImage: "play.fill")
+                    }
+                }
+                .disabled(isTriggeringManually)
+                
+                Button(role: .destructive, action: { showingDeleteAlert = true }) {
+                    Label("Delete Automation", systemImage: "trash")
+                }
+                
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
         }
         .formStyle(.grouped)
         .navigationTitle(automation.name)
+        .alert("Delete Automation", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                store.delete(automation.id)
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(automation.name)\"? This cannot be undone.")
+        }
+    }
+    
+    private func triggerManually() {
+        Task {
+            isTriggeringManually = true
+            errorMessage = nil
+            defer { isTriggeringManually = false }
+            
+            do {
+                try await HelperAPIClient.shared.triggerAutomation(automation.id)
+                // Give it a moment to execute
+                try? await Task.sleep(for: .seconds(1))
+                store.reload()
+            } catch {
+                errorMessage = "Failed to trigger: \(error.localizedDescription)"
+                print("Failed to trigger automation: \(error)")
+            }
+        }
     }
 }
 
@@ -224,6 +315,8 @@ struct AutomationDetailView: View {
     ContentView()
 }
 #Preview("Automation Detail") {
+    let store = AutomationStore()
+    
     NavigationStack {
         AutomationDetailView(
             automation: RegisteredAutomation(
@@ -245,7 +338,8 @@ struct AutomationDetailView: View {
                 enabled: true,
                 shortcutName: "Morning Lights",
                 createdAt: "2026-02-26T08:00:00Z"
-            )
+            ),
+            store: store
         )
     }
 }

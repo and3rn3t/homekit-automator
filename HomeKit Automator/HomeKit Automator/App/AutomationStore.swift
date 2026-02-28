@@ -28,7 +28,7 @@ final class AutomationStore {
 
     // MARK: - File Paths
 
-    private let configDir: URL
+    let configDir: URL  // Make public for debugging
 
     private var registryPath: URL {
         configDir.appendingPathComponent("automations.json")

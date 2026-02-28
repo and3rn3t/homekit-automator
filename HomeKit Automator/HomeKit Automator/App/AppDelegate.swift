@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var healthCheckTimer: Timer?
     private var dashboardWindow: NSWindow?
     private var historyWindow: NSWindow?
+    private var debugWindow: NSWindow?
 
     let helperManager = HelperManager()
 
@@ -74,6 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let restartHelperItem = NSMenuItem(title: "Restart Helper", action: #selector(restartHelper), keyEquivalent: "r")
         restartHelperItem.target = self
         menu.addItem(restartHelperItem)
+        
+        let debugItem = NSMenuItem(title: "Debug Info…", action: #selector(openDebug), keyEquivalent: "")
+        debugItem.target = self
+        debugItem.isAlternate = true
+        debugItem.keyEquivalentModifierMask = .option
+        menu.addItem(debugItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -200,6 +207,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         historyWindow = window
+    }
+    
+    @objc private func openDebug() {
+        if let window = debugWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let debugView = DebugView()
+        let hostingView = NSHostingView(rootView: debugView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Debug Information"
+        window.contentView = hostingView
+        window.center()
+        window.setFrameAutosaveName("DebugWindow")
+        window.isReleasedWhenClosed = false
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        debugWindow = window
     }
 
     @objc private func openSettings() {

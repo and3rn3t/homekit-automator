@@ -44,7 +44,7 @@ struct AutomationDefinition: Codable, Sendable {
 // MARK: - Registered Automation
 
 /// A fully validated and registered automation persisted in the local registry.
-struct RegisteredAutomation: Codable, Identifiable, Sendable {
+struct RegisteredAutomation: Codable, Identifiable, Sendable, Hashable {
     var id: String
     var name: String
     var description: String?
@@ -71,12 +71,22 @@ struct RegisteredAutomation: Codable, Identifiable, Sendable {
         self.createdAt = createdAt
         self.lastRun = lastRun
     }
+    
+    // MARK: - Hashable
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: RegisteredAutomation, rhs: RegisteredAutomation) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Trigger
 
 /// Defines when an automation fires.
-struct AutomationTrigger: Codable, Sendable {
+struct AutomationTrigger: Codable, Sendable, Hashable {
     let type: String
     let humanReadable: String
     let cron: String?
@@ -115,7 +125,7 @@ struct AutomationTrigger: Codable, Sendable {
 // MARK: - Condition
 
 /// Optional guard that must evaluate to true for an automation to execute.
-struct AutomationCondition: Codable, Sendable {
+struct AutomationCondition: Codable, Sendable, Hashable {
     let type: String
     let humanReadable: String
     let after: String?
@@ -152,7 +162,7 @@ struct AutomationCondition: Codable, Sendable {
 // MARK: - Action
 
 /// A single device control action within an automation.
-struct AutomationAction: Codable, Sendable {
+struct AutomationAction: Codable, Sendable, Hashable {
     let type: String?
     let deviceUuid: String
     let deviceName: String
@@ -250,7 +260,7 @@ struct AutomationLogEntry: Codable, Identifiable, Sendable {
 
 /// A type-erased Codable value supporting JSON primitives.
 /// This should match the canonical version in HomeKitCore/AnyCodableValue.swift.
-enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible {
+enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible, Hashable {
     case string(String)
     case int(Int)
     case double(Double)
