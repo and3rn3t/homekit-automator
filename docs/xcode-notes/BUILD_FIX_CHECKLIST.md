@@ -9,8 +9,8 @@ Use this checklist to track your progress fixing the build:
 
 ## Option A: Automated Script
 - [ ] Opened Terminal in project directory
-- [ ] Made script executable: `chmod +x fix-xcode-project.sh`
-- [ ] Ran the script: `./fix-xcode-project.sh`
+- [ ] Made script executable: `chmod +x scripts/fix-xcode.sh`
+- [ ] Ran the script: `./scripts/fix-xcode.sh`
 - [ ] Script completed successfully
 - [ ] Followed the "Next steps" shown by the script
 

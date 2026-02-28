@@ -3,6 +3,7 @@
 ## 🎯 You Have a Build Error
 
 The error you're seeing:
+
 ```
 lstat: No such file or directory
 ```
@@ -16,18 +17,21 @@ This means your Xcode project isn't properly organized. **Don't worry - we can f
 ### Option A: Automated Script (Recommended) 🤖
 
 1. **Open Terminal** in your project folder:
+
    ```bash
    cd /path/to/your/project
    ```
 
 2. **Make the script executable:**
+
    ```bash
-   chmod +x fix-xcode-project.sh
+   chmod +x scripts/fix-xcode.sh
    ```
 
 3. **Run it:**
+
    ```bash
-   ./fix-xcode-project.sh
+   ./scripts/fix-xcode.sh
    ```
 
 4. **Follow the on-screen prompts** (it will ask before deleting anything)
@@ -62,7 +66,7 @@ I've created/verified these files for you:
 - ✅ **AutomationStore.swift** - Data store for automations and logs
 - ✅ **SocketConstants.swift** - Socket communication constants
 - ✅ **XCODE_ORGANIZATION_GUIDE.md** - Detailed manual instructions
-- ✅ **fix-xcode-project.sh** - Automated fix script
+- ✅ **scripts/fix-xcode.sh** - Automated fix script
 
 All other files were already present in your project.
 
@@ -77,12 +81,12 @@ Your project has two issues:
 1. **Filename conflict:** A file called `Models.swift` exists both in:
    - Your app target (old location)
    - The Swift Package Manager module `HomeKitCore`
-   
+
    This causes Xcode to try compiling both, creating a collision.
 
 2. **Missing target membership:** Some Swift files aren't properly added to your app target, so Xcode doesn't know to compile them.
 
-### The solution:
+### The solution
 
 1. **Rename the app's Models.swift** → **AutomationModels.swift** (already done!)
 2. **Add all Swift files to the app target** (the script helps with this)
@@ -126,12 +130,14 @@ Your project **must** have these files (all in the root directory):
 ### Can't find the script or guide?
 
 They're in your project root:
-- `fix-xcode-project.sh` - The automated script
+
+- `scripts/fix-xcode.sh` - The automated fix script
 - `XCODE_ORGANIZATION_GUIDE.md` - Step-by-step manual guide
 
 ### Build succeeds but app won't run?
 
 This is a **different** issue (not project organization). Check:
+
 - Menu bar icon should appear (house icon 🏠)
 - Check Console.app for crash logs
 - Verify app permissions (HomeKit, etc.)
@@ -177,7 +183,7 @@ After fixing:
 
 ---
 
-## 🎉 You're Almost There!
+## 🎉 You're Almost There
 
 Just run the script or follow the manual guide, and you'll be building successfully in minutes!
 

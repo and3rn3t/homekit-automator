@@ -1,6 +1,6 @@
 # 🔧 FIX BUILD ERRORS NOW
 
-## Your Current Errors:
+## Your Current Errors
 
 ```
 ❌ Filename "Models.swift" used twice
@@ -13,14 +13,16 @@
 ### **Option A: Use the Script (Fastest)**
 
 1. **Open Terminal** in your project folder:
+
    ```bash
    cd ~/Documents/GitHub/homekit-automator
    ```
 
 2. **Run the fix script:**
+
    ```bash
-   chmod +x fix-build.sh
-   ./fix-build.sh
+   chmod +x scripts/fix-xcode.sh
+   ./scripts/fix-xcode.sh
    ```
 
 3. **Open Xcode and continue with manual steps below**
@@ -32,6 +34,7 @@
 ## Step 1: Clean Everything First 🧹
 
 **In Xcode:**
+
 1. Press **⌘⇧K** (Product → Clean Build Folder)
 2. Wait for "Clean Finished"
 
@@ -48,7 +51,7 @@
 2. **Right-click on `Models.swift`**
    - Choose **"Delete"**
    - Choose **"Move to Trash"** (NOT "Remove Reference")
-   
+
 3. **Verify it's gone:**
    - Check that `Models.swift` no longer appears in the file list
 
@@ -112,12 +115,14 @@
 **Solution:** File still exists in file system but not visible in Xcode
 
 **In Terminal:**
+
 ```bash
 cd ~/Documents/GitHub/homekit-automator
 find . -name "Models.swift" -type f
 ```
 
 If you see `./HomeKit Automator/App/Models.swift`, delete it:
+
 ```bash
 rm "./HomeKit Automator/App/Models.swift"
 ```
@@ -153,6 +158,7 @@ After the build succeeds:
 ## 🎯 Expected Project Structure
 
 **Correct:**
+
 ```
 HomeKit Automator/
 ├── App/
@@ -172,11 +178,12 @@ HomeKit Automator/
 
 ## 🆘 Still Having Issues?
 
-### Try Nuclear Option:
+### Try Nuclear Option
 
 1. **Close Xcode completely** (⌘Q)
 
 2. **In Terminal:**
+
    ```bash
    cd ~/Documents/GitHub/homekit-automator
    
@@ -214,9 +221,10 @@ If Xcode is being stubborn about the old `Models.swift`:
 
 ---
 
-## 🎉 Success Looks Like:
+## 🎉 Success Looks Like
 
 **Build Output:**
+
 ```
 Build target HomeKit Automator
 ...
@@ -224,6 +232,7 @@ Build target HomeKit Automator
 ```
 
 **Then when you run (⌘R):**
+
 - App launches
 - Menu bar icon appears (🏠)
 - No crash, no errors
@@ -234,6 +243,7 @@ Build target HomeKit Automator
 ## 📝 What's Happening?
 
 The error occurs because:
+
 1. **Two files named `Models.swift` exist** in your build targets
 2. Xcode tries to compile both into `Models.stringsdata`
 3. This creates a collision
@@ -247,6 +257,7 @@ The new file has **identical content** but a **different name** to avoid conflic
 ## 🚀 After Build Succeeds
 
 Run the app (⌘R) and verify:
+
 - ✅ Menu bar icon appears
 - ✅ Click icon → See menu
 - ✅ "Show Automations…" opens window
