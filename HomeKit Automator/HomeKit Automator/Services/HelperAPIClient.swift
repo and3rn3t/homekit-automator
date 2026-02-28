@@ -135,11 +135,18 @@ final class HelperAPIClient {
             let configDir = SocketConstants.appSupportDir ?? FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent(".config/homekit-automator")
             let registryPath = configDir.appendingPathComponent("automations.json")
-            guard let data = try? Data(contentsOf: registryPath),
-                  let automations = try? JSONDecoder().decode([RegisteredAutomation].self, from: data) else {
-                throw HelperAPIError.serverError("Could not load automations registry")
+            let data: Data
+            do {
+                data = try Data(contentsOf: registryPath)
+            } catch {
+                throw HelperAPIError.serverError("Could not read automations registry: \(error.localizedDescription)")
             }
-            automation = automations.first { $0.id == automationId }
+            do {
+                let automations = try JSONDecoder().decode([RegisteredAutomation].self, from: data)
+                automation = automations.first { $0.id == automationId }
+            } catch {
+                throw HelperAPIError.serverError("Automations registry is corrupt: \(error.localizedDescription)")
+            }
         }
         
         guard let automation = automation else {
@@ -176,7 +183,16 @@ final class HelperAPIClient {
         // Load existing automations
         var automations: [RegisteredAutomation] = []
         if let data = try? Data(contentsOf: registryPath) {
-            automations = (try? JSONDecoder().decode([RegisteredAutomation].self, from: data)) ?? []
+            do {
+                automations = try JSONDecoder().decode([RegisteredAutomation].self, from: data)
+            } catch {
+                // Registry exists but contains corrupt JSON — back it up instead of silently discarding
+                let backupPath = registryPath.deletingPathExtension()
+                    .appendingPathExtension("corrupt-\(Int(Date().timeIntervalSince1970)).json")
+                try? FileManager.default.copyItem(at: registryPath, to: backupPath)
+                print("[HelperAPIClient] WARNING: Corrupt automations registry backed up to \(backupPath.lastPathComponent). Decode error: \(error.localizedDescription)")
+                throw HelperAPIError.serverError("Automations registry is corrupt (backed up). Decode error: \(error.localizedDescription)")
+            }
         }
         
         // Check for duplicate name

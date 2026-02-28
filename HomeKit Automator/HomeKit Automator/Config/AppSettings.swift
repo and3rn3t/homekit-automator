@@ -81,9 +81,16 @@ enum AppSettingsDefaults {
     static let temperatureUnit = TemperatureUnit.celsius.rawValue
     static let launchAtLogin = false
     static let socketPath: String = {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            print("[AppSettings] WARNING: Application Support directory unavailable, falling back to /tmp")
+            return "/tmp/homekitauto.sock"
+        }
         let dir = appSupport.appendingPathComponent("homekit-automator")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[AppSettings] WARNING: Could not create config directory: \(error.localizedDescription)")
+        }
         return dir.appendingPathComponent("homekitauto.sock").path
     }()
     static let logRetentionDays = 30

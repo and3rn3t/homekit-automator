@@ -172,7 +172,12 @@ struct LLMSettingsTab: View {
                     if newValue.isEmpty {
                         KeychainHelper.delete(forKey: AppSettingsKeys.llmAPIKey)
                     } else {
-                        try? KeychainHelper.save(newValue, forKey: AppSettingsKeys.llmAPIKey)
+                        do {
+                            try KeychainHelper.save(newValue, forKey: AppSettingsKeys.llmAPIKey)
+                        } catch {
+                            print("[Settings] WARNING: Failed to save API key to Keychain: \(error.localizedDescription)")
+                            testResult = "⚠️ Could not save API key to Keychain. It may not persist across restarts."
+                        }
                     }
                 }
 
@@ -243,14 +248,17 @@ struct LLMSettingsTab: View {
     }
 
     private var apiKeyURL: URL {
+        let urlString: String
         switch selectedProvider {
         case .openai:
-            return URL(string: "https://platform.openai.com/api-keys")!
+            urlString = "https://platform.openai.com/api-keys"
         case .claude:
-            return URL(string: "https://console.anthropic.com/settings/keys")!
+            urlString = "https://console.anthropic.com/settings/keys"
         case .custom:
-            return URL(string: "https://example.com")!
+            urlString = "https://example.com"
         }
+        // These are hardcoded valid URLs, but guard against unexpected failures
+        return URL(string: urlString) ?? URL(string: "https://example.com")!
     }
 
     private func testConnection() {

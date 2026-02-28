@@ -30,7 +30,11 @@ public enum SocketConstants {
             return nil
         }
         let dir = appSupport.appendingPathComponent("homekit-automator")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            print("[SocketConstants] WARNING: Could not create config directory \(dir.path): \(error.localizedDescription)")
+        }
         return dir
     }
 

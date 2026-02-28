@@ -31,7 +31,9 @@ class HelperSocketServer {
 
     /// Creates the socket, binds to the Application Support socket path with 0o600 permissions, and begins accepting connections.
     /// Accepts clients on a background GCD queue without blocking the main thread.
-    func start() {
+    /// - Returns: `true` if the server started successfully, `false` if socket/bind/listen failed.
+    @discardableResult
+    func start() -> Bool {
         let socketPath = SocketConstants.defaultPath
 
         // Warn about and clean up legacy socket path
@@ -46,8 +48,8 @@ class HelperSocketServer {
         // Create socket
         serverSocket = socket(AF_UNIX, SOCK_STREAM, 0)
         guard serverSocket >= 0 else {
-            print("[SocketServer] ERROR: Could not create socket")
-            return
+            print("[SocketServer] ERROR: Could not create socket (errno: \(errno) \u{2014} \(String(cString: strerror(errno))))")
+            return false
         }
 
         // Bind to path
@@ -69,8 +71,8 @@ class HelperSocketServer {
         }
 
         guard bindResult == 0 else {
-            print("[SocketServer] ERROR: Could not bind to \(socketPath)")
-            return
+            print("[SocketServer] ERROR: Could not bind to \(socketPath) (errno: \(errno) \u{2014} \(String(cString: strerror(errno))))")
+            return false
         }
 
         // Set socket permissions (owner only)
@@ -78,8 +80,8 @@ class HelperSocketServer {
 
         // Listen
         guard listen(serverSocket, 5) == 0 else {
-            print("[SocketServer] ERROR: Could not listen")
-            return
+            print("[SocketServer] ERROR: Could not listen (errno: \(errno) \u{2014} \(String(cString: strerror(errno))))")
+            return false
         }
 
         isRunning = true
@@ -89,6 +91,7 @@ class HelperSocketServer {
         queue.async { [weak self] in
             self?.acceptLoop()
         }
+        return true
     }
 
     /// Stops the accept loop, closes the server socket, and removes the socket file.
@@ -124,7 +127,7 @@ class HelperSocketServer {
 
             if clientSocket < 0 {
                 if isRunning {
-                    print("[SocketServer] Accept error: \(errno)")
+                    print("[SocketServer] Accept error: \(errno) \u{2014} \(String(cString: strerror(errno)))")
                 }
                 continue
             }
@@ -182,10 +185,18 @@ class HelperSocketServer {
         }
 
         guard let request = try? JSONDecoder().decode(Request.self, from: data) else {
-            sendError(clientSocket, id: "unknown", message: "Invalid request JSON")
+            let preview = String(data: data.prefix(200), encoding: .utf8) ?? "<binary>"
+            print("[SocketServer] ERROR: Could not decode request JSON: \(preview)")
+            if let decodeError = (try? { () throws -> Request in try JSONDecoder().decode(Request.self, from: data) })() {
+                _ = decodeError // unreachable, used to extract error
+            }
+            sendError(clientSocket, id: "unknown", message: "Invalid request JSON. Ensure request has 'id' (string) and 'command' (string) fields.")
             close(clientSocket)
             return
         }
+
+        let startTime = CFAbsoluteTimeGetCurrent()
+        print("[SocketServer] \u{2192} Received command: \(request.command) (id: \(request.id.prefix(8))...)")
 
         // Validate authentication token
         guard SocketConstants.validateToken(request.token) else {
@@ -214,11 +225,11 @@ class HelperSocketServer {
 
                 /// "status": Returns overall HomeKit status (connected, homes, automation count)
                 case "status":
-                    responseData = await self.homeKitManager.getStatus()
+                    responseData = try await self.homeKitManager.getStatus()
 
                 /// "discover": Enumerates all homes, rooms, accessories, characteristics, and scenes
                 case "discover":
-                    responseData = await self.homeKitManager.discover()
+                    responseData = try await self.homeKitManager.discover()
 
                 /// "get_device": Retrieves all characteristics (state) of a named or UUID accessory
                 case "get_device":
@@ -240,13 +251,13 @@ class HelperSocketServer {
                 /// "list_rooms": Lists all rooms across all homes (or filtered by homeName)
                 case "list_rooms":
                     let home = request.params?["home"]?.stringValue
-                    let rooms = await self.homeKitManager.listRooms(homeName: home)
+                    let rooms = try await self.homeKitManager.listRooms(homeName: home)
                     responseData = ["rooms": rooms]
 
                 /// "list_scenes": Lists all scenes (action sets) across all homes (or filtered by homeName)
                 case "list_scenes":
                     let home = request.params?["home"]?.stringValue
-                    let scenes = await self.homeKitManager.listScenes(homeName: home)
+                    let scenes = try await self.homeKitManager.listScenes(homeName: home)
                     responseData = ["scenes": scenes]
 
                 /// "trigger_scene": Executes a scene by name or UUID
@@ -306,10 +317,13 @@ class HelperSocketServer {
         }
 
         dispatchGroup.notify(queue: .global()) { [self] in
+            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
             // Send response (and close socket) once MainActor work is done
             if let error = responseError {
+                print("[SocketServer] \u{2190} Command \(request.command) failed (\(String(format: "%.1f", elapsed * 1000))ms): \(error)")
                 self.sendError(clientSocket, id: request.id, message: error)
             } else {
+                print("[SocketServer] \u{2190} Command \(request.command) completed (\(String(format: "%.1f", elapsed * 1000))ms)")
                 self.sendSuccess(clientSocket, id: request.id, data: responseData)
             }
             close(clientSocket)
@@ -342,10 +356,32 @@ class HelperSocketServer {
     }
 
     private func sendJSON(_ socket: Int32, _ object: [String: Any]) {
-        guard var data = try? JSONSerialization.data(withJSONObject: object) else { return }
-        data.append(contentsOf: "\n".utf8)
-        data.withUnsafeBytes { buffer in
-            _ = send(socket, buffer.baseAddress!, buffer.count, 0)
+        let data: Data
+        do {
+            data = try JSONSerialization.data(withJSONObject: object)
+        } catch {
+            print("[SocketServer] ERROR: Failed to serialize response JSON: \(error.localizedDescription)")
+            // Send a minimal error response so the client doesn't hang
+            let fallback = "{\"status\":\"error\",\"error\":\"Internal: response serialization failed\"}\n"
+            _ = fallback.withCString { ptr in
+                Darwin.send(socket, ptr, strlen(ptr), 0)
+            }
+            return
+        }
+        var payload = data
+        payload.append(contentsOf: "\n".utf8)
+        payload.withUnsafeBytes { buffer in
+            guard let baseAddress = buffer.baseAddress else { return }
+            var totalSent = 0
+            let count = buffer.count
+            while totalSent < count {
+                let sent = Darwin.send(socket, baseAddress + totalSent, count - totalSent, 0)
+                if sent <= 0 {
+                    print("[SocketServer] WARNING: send() failed after \(totalSent)/\(count) bytes (errno: \(errno) — \(String(cString: strerror(errno))))")
+                    break
+                }
+                totalSent += sent
+            }
         }
     }
 

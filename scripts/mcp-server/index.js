@@ -412,9 +412,10 @@ async function runCli(args) {
     }
     return stdout.trim();
   } catch (error) {
-    throw new Error(
-      `CLI error: ${error.stderr || error.message}`
-    );
+    const details = [error.stderr || error.message];
+    if (error.code !== undefined) details.push(`exit code ${error.code}`);
+    if (error.signal) details.push(`signal ${error.signal}`);
+    throw new Error(`CLI error: ${details.join(" — ")}`);
   } finally {
     if (child) activeProcesses.delete(child);
   }
@@ -648,17 +649,28 @@ function validateArgs(toolName, args) {
 const rl = createInterface({ input: process.stdin });
 
 rl.on("line", async (line) => {
+  let parsed;
   try {
-    const message = JSON.parse(line);
-    const response = await handleMessage(message);
+    parsed = JSON.parse(line);
+  } catch (parseError) {
+    const errorResponse = {
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32700, message: "Parse error" },
+    };
+    process.stdout.write(JSON.stringify(errorResponse) + "\n");
+    return;
+  }
+  try {
+    const response = await handleMessage(parsed);
     if (response) {
       process.stdout.write(JSON.stringify(response) + "\n");
     }
   } catch (error) {
     const errorResponse = {
       jsonrpc: "2.0",
-      id: null,
-      error: { code: -32700, message: "Parse error" },
+      id: parsed.id ?? null,
+      error: { code: -32603, message: `Internal error: ${error.message}` },
     };
     process.stdout.write(JSON.stringify(errorResponse) + "\n");
   }
@@ -766,5 +778,11 @@ function shutdown() {
 }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
+// Exit cleanly when the parent process closes our stdin (e.g. host app terminates)
+rl.on('close', () => {
+  process.stderr.write('[HomeKit Automator MCP] stdin closed, shutting down\n');
+  shutdown();
+});
 
 process.stderr.write("[HomeKit Automator MCP] Server started\n");

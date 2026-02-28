@@ -63,10 +63,41 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// Waits until HomeKit has loaded home data from iCloud.
     /// Uses CheckedContinuation pattern to allow multiple concurrent waiters without blocking.
     /// Returns immediately if homes are already loaded.
-    func waitForReady() async {
+    /// Times out after 30 seconds to prevent indefinite hangs (e.g., iCloud sync issues).
+    func waitForReady() async throws {
         if isReady { return }
-        await withCheckedContinuation { continuation in
-            readyContinuations.append(continuation)
+        let readyTask = Task { @MainActor in
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                readyContinuations.append(continuation)
+            }
+        }
+        let timeoutTask = Task {
+            try await Task.sleep(for: .seconds(30))
+        }
+        // Race: whichever finishes first wins
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask { await readyTask.value; return true }
+            group.addTask { return (try? await timeoutTask.value) == nil ? false : false }
+            if let first = await group.next(), !first {
+                readyTask.cancel()
+            }
+            group.cancelAll()
+        }
+        guard isReady else {
+            print("[HomeKitManager] ERROR: Timed out waiting for HomeKit to load homes (30s)")
+            throw HomeKitManagerError.homeKitLoadTimeout
+        }
+    }
+
+    /// Errors that can occur during HomeKit operations.
+    enum HomeKitManagerError: LocalizedError {
+        case homeKitLoadTimeout
+
+        var errorDescription: String? {
+            switch self {
+            case .homeKitLoadTimeout:
+                return "HomeKit did not finish loading within 30 seconds. Check iCloud and HomeKit entitlements."
+            }
         }
     }
 
@@ -132,8 +163,8 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
 
     /// Returns overall HomeKit status: connection state, homes, and automation count.
     /// - Returns: Dictionary with keys "connected" (bool), "homes" (array), "automationCount" (int)
-    func getStatus() async -> [String: Any] {
-        await waitForReady()
+    func getStatus() async throws -> [String: Any] {
+        try await waitForReady()
         let homes = homeManager.homes.map { home -> [String: Any] in
             [
                 "name": home.name,
@@ -153,8 +184,8 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// Discovers all homes, rooms, accessories, characteristics, and scenes.
     /// Returns complete HomeKit topology for display and device lookup.
     /// - Returns: Dictionary with keys "homes" (array of home objects) and "summary" (human-readable count string)
-    func discover() async -> [String: Any] {
-        await waitForReady()
+    func discover() async throws -> [String: Any] {
+        try await waitForReady()
 
         let homes = homeManager.homes.map { home -> [String: Any] in
             let rooms = home.rooms.map { room -> [String: Any] in
@@ -227,7 +258,7 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// - Returns: Dictionary with device info including "device", "uuid", "room", "reachable", "category", "state" (characteristic values)
     /// - Throws: HomeKitError.deviceNotFound if accessory not found
     func getDevice(nameOrUuid: String) async throws -> [String: Any] {
-        await waitForReady()
+        try await waitForReady()
         guard let accessory = findAccessory(nameOrUuid) else {
             throw HomeKitError.deviceNotFound(nameOrUuid)
         }
@@ -243,7 +274,7 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// - Returns: Dictionary confirming the change with "device", "characteristic", "previousValue", "newValue", "confirmed"
     /// - Throws: HomeKitError for device not found, characteristic not found, or read-only characteristic
     func setDevice(nameOrUuid: String, characteristic: String, value: Any) async throws -> [String: Any] {
-        await waitForReady()
+        try await waitForReady()
         guard let accessory = findAccessory(nameOrUuid) else {
             throw HomeKitError.deviceNotFound(nameOrUuid)
         }
@@ -278,8 +309,8 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// - Parameters:
     ///   - homeName: Optional; if provided, filters scenes to only this home
     /// - Returns: Array of scene objects with "uuid", "name", "actions" (count), "home"
-    func listScenes(homeName: String? = nil) async -> [[String: Any]] {
-        await waitForReady()
+    func listScenes(homeName: String? = nil) async throws -> [[String: Any]] {
+        try await waitForReady()
         let homes = homeName != nil
             ? homeManager.homes.filter { $0.name == homeName }
             : homeManager.homes
@@ -302,7 +333,7 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// - Returns: Dictionary with "scene" (name), "actionsExecuted" (count), "confirmed"
     /// - Throws: HomeKitError.sceneNotFound if scene not found
     func triggerScene(nameOrUuid: String) async throws -> [String: Any] {
-        await waitForReady()
+        try await waitForReady()
 
         for home in homeManager.homes {
             for actionSet in home.actionSets {
@@ -327,8 +358,8 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// - Parameters:
     ///   - homeName: Optional; if provided, filters rooms to only this home
     /// - Returns: Array of room objects with "name", "home", "accessoryCount", "accessories" (array of device info)
-    func listRooms(homeName: String? = nil) async -> [[String: Any]] {
-        await waitForReady()
+    func listRooms(homeName: String? = nil) async throws -> [[String: Any]] {
+        try await waitForReady()
         let homes = homeName != nil
             ? homeManager.homes.filter { $0.name == homeName }
             : homeManager.homes

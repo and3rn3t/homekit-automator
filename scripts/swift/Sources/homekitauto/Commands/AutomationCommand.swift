@@ -845,11 +845,11 @@ struct AutomationImport: AsyncParsableCommand {
         for automation in automations {
             do {
                 let existing = try await registry.find(automation.name)
-                if existing != nil {
+                if let existing = existing {
                     if force {
                         // Update existing automation
                         var toUpdate = automation
-                        toUpdate.id = existing!.id  // Preserve original ID
+                        toUpdate.id = existing.id  // Preserve original ID
                         try await registry.update(toUpdate)
                         updated += 1
                     } else {
