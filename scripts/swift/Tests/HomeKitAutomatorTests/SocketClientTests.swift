@@ -1,6 +1,7 @@
 // SocketClientTests.swift
 // Tests for SocketClient data types: Request/Response Codable conformance,
 // Response.isOk computed property, and SocketError descriptions.
+// swiftlint:disable force_cast
 
 import XCTest
 @testable import homekitauto

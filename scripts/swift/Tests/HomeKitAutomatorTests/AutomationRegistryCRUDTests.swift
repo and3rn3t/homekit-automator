@@ -262,7 +262,7 @@ final class AutomationRegistryCRUDTests: XCTestCase {
 
         // At minimum, some saves should have succeeded and the file should be readable
         let all = try await registry.loadAll()
-        XCTAssertTrue(all.count > 0, "At least some concurrent saves should succeed")
+        XCTAssertFalse(all.isEmpty, "At least some concurrent saves should succeed")
         XCTAssertTrue(all.count <= saveCount, "Should not exceed total save attempts")
         XCTAssertEqual(all.count, successCount, "Loaded count should match successful saves")
     }

@@ -107,7 +107,8 @@ actor SocketClient {
 
         // Warn if legacy socket path still exists
         if FileManager.default.fileExists(atPath: SocketConstants.legacySocketPath) {
-            Log.socket.warning("Legacy socket found at \(SocketConstants.legacySocketPath) — please remove it. Socket has moved to \(Self.socketPath)")
+            let msg = "Legacy socket at \(SocketConstants.legacySocketPath) — remove it. Moved to \(Self.socketPath)"
+            Log.socket.warning("\(msg)")
         }
 
         let request = Request(id: requestId, command: command, params: params, token: token,

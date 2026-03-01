@@ -38,7 +38,8 @@ class HelperSocketServer {
 
         // Warn about and clean up legacy socket path
         if FileManager.default.fileExists(atPath: SocketConstants.legacySocketPath) {
-            print("[SocketServer] WARNING: Legacy socket found at \(SocketConstants.legacySocketPath) — please remove it. Socket has moved to \(socketPath)")
+            let legacyMsg = "Legacy socket at \(SocketConstants.legacySocketPath) — remove it. Moved to \(socketPath)"
+            print("[SocketServer] WARNING: \(legacyMsg)")
             unlink(SocketConstants.legacySocketPath)
         }
 
@@ -220,97 +221,11 @@ class HelperSocketServer {
         Task { @MainActor in
             defer { dispatchGroup.leave() }
             do {
-                switch request.command {
-                /// COMMAND DISPATCH:
-
-                /// "status": Returns overall HomeKit status (connected, homes, automation count)
-                case "status":
-                    responseData = try await self.homeKitManager.getStatus()
-
-                /// "discover": Enumerates all homes, rooms, accessories, characteristics, and scenes
-                case "discover":
-                    responseData = try await self.homeKitManager.discover()
-
-                /// "get_device": Retrieves all characteristics (state) of a named or UUID accessory
-                case "get_device":
-                    let name = request.params?["name"]?.stringValue ?? ""
-                    responseData = try await self.homeKitManager.getDevice(nameOrUuid: name)
-
-                /// "set_device": Writes a single characteristic value on a device
-                case "set_device":
-                    let name = request.params?["name"]?.stringValue ??
-                               request.params?["uuid"]?.stringValue ?? ""
-                    let characteristic = request.params?["characteristic"]?.stringValue ?? ""
-                    let value = request.params?["value"]?.rawValue ?? ""
-                    responseData = try await self.homeKitManager.setDevice(
-                        nameOrUuid: name,
-                        characteristic: characteristic,
-                        value: value
-                    )
-
-                /// "list_rooms": Lists all rooms across all homes (or filtered by homeName)
-                case "list_rooms":
-                    let home = request.params?["home"]?.stringValue
-                    let rooms = try await self.homeKitManager.listRooms(homeName: home)
-                    responseData = ["rooms": rooms]
-
-                /// "list_scenes": Lists all scenes (action sets) across all homes (or filtered by homeName)
-                case "list_scenes":
-                    let home = request.params?["home"]?.stringValue
-                    let scenes = try await self.homeKitManager.listScenes(homeName: home)
-                    responseData = ["scenes": scenes]
-
-                /// "trigger_scene": Executes a scene by name or UUID
-                case "trigger_scene":
-                    let name = request.params?["name"]?.stringValue ?? ""
-                    responseData = try await self.homeKitManager.triggerScene(nameOrUuid: name)
-
-                /// "state_changes": Returns recent device state changes from the circular buffer
-                case "state_changes":
-                    let deviceFilter = request.params?["device"]?.stringValue
-                    let changes = self.homeKitManager.getStateChanges(deviceName: deviceFilter)
-                    responseData = [
-                        "changes": changes,
-                        "count": changes.count
-                    ]
-
-                /// "subscribe": Subscribes to state change notifications for a specific device
-                case "subscribe":
-                    let deviceName = request.params?["device"]?.stringValue ?? ""
-                    if deviceName.isEmpty {
-                        responseError = "Missing 'device' parameter for subscribe command"
-                    } else {
-                        responseData = self.homeKitManager.subscribe(deviceName: deviceName)
-                    }
-
-                /// "get_config": Returns persisted config (filterMode, defaultHome, etc.)
-                case "get_config":
-                    responseData = self.loadConfig()
-
-                /// "set_config": Updates config values (filterMode, defaultHome) and persists to ~/Library/Application Support/homekit-automator/config.json
-                case "set_config":
-                    // Update config values
-                    var config = self.loadConfig()
-                    if let home = request.params?["defaultHome"]?.stringValue {
-                        config["defaultHome"] = home
-                    }
-                    if let mode = request.params?["filterMode"]?.stringValue {
-                        config["filterMode"] = mode
-                    }
-                    self.saveConfig(config)
-                    responseData = config
-
-                /// "shutdown": Signals the app to exit (for graceful process termination)
-                case "shutdown":
-                    responseData = ["status": "shutting_down"]
-                    // Exit after responding
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        exit(0)
-                    }
-
-                default:
-                    responseError = "Unknown command: \(request.command)"
-                }
+                let result = try await self.dispatchCommand(
+                    request.command, params: request.params
+                )
+                responseData = result.data
+                responseError = result.error
             } catch {
                 responseError = error.localizedDescription
             }
@@ -327,6 +242,66 @@ class HelperSocketServer {
                 self.sendSuccess(clientSocket, id: request.id, data: responseData)
             }
             close(clientSocket)
+        }
+    }
+
+    // MARK: - Command Dispatch
+
+    /// Dispatches a command to the appropriate HomeKitManager method.
+    /// Returns both data and an optional error string; at most one will be populated.
+    @MainActor
+    private func dispatchCommand(
+        _ command: String, params: [String: AnyCodableValue]?
+    ) async throws -> (data: [String: Any], error: String?) {
+        switch command {
+        case "status":
+            return (try await homeKitManager.getStatus(), nil)
+        case "discover":
+            return (try await homeKitManager.discover(), nil)
+        case "get_device":
+            let name = params?["name"]?.stringValue ?? ""
+            return (try await homeKitManager.getDevice(nameOrUuid: name), nil)
+        case "set_device":
+            let name = params?["name"]?.stringValue ?? params?["uuid"]?.stringValue ?? ""
+            let characteristic = params?["characteristic"]?.stringValue ?? ""
+            let value = params?["value"]?.rawValue ?? ""
+            return (try await homeKitManager.setDevice(
+                nameOrUuid: name, characteristic: characteristic, value: value
+            ), nil)
+        case "list_rooms":
+            let home = params?["home"]?.stringValue
+            let rooms = try await homeKitManager.listRooms(homeName: home)
+            return (["rooms": rooms], nil)
+        case "list_scenes":
+            let home = params?["home"]?.stringValue
+            let scenes = try await homeKitManager.listScenes(homeName: home)
+            return (["scenes": scenes], nil)
+        case "trigger_scene":
+            let name = params?["name"]?.stringValue ?? ""
+            return (try await homeKitManager.triggerScene(nameOrUuid: name), nil)
+        case "state_changes":
+            let deviceFilter = params?["device"]?.stringValue
+            let changes = homeKitManager.getStateChanges(deviceName: deviceFilter)
+            return (["changes": changes, "count": changes.count], nil)
+        case "subscribe":
+            let deviceName = params?["device"]?.stringValue ?? ""
+            if deviceName.isEmpty {
+                return ([:], "Missing 'device' parameter for subscribe command")
+            }
+            return (homeKitManager.subscribe(deviceName: deviceName), nil)
+        case "get_config":
+            return (loadConfig(), nil)
+        case "set_config":
+            var config = loadConfig()
+            if let home = params?["defaultHome"]?.stringValue { config["defaultHome"] = home }
+            if let mode = params?["filterMode"]?.stringValue { config["filterMode"] = mode }
+            saveConfig(config)
+            return (config, nil)
+        case "shutdown":
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
+            return (["status": "shutting_down"], nil)
+        default:
+            return ([:], "Unknown command: \(command)")
         }
     }
 
@@ -377,7 +352,8 @@ class HelperSocketServer {
             while totalSent < count {
                 let sent = Darwin.send(socket, baseAddress + totalSent, count - totalSent, 0)
                 if sent <= 0 {
-                    print("[SocketServer] WARNING: send() failed after \(totalSent)/\(count) bytes (errno: \(errno) — \(String(cString: strerror(errno))))")
+                    let errDesc = String(cString: strerror(errno))
+                    print("[SocketServer] WARNING: send() failed after \(totalSent)/\(count) bytes (errno: \(errno) — \(errDesc))")
                     break
                 }
                 totalSent += sent

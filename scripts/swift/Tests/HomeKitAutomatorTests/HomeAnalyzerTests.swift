@@ -1,5 +1,6 @@
 // HomeAnalyzerTests.swift
 // Tests for HomeAnalyzer suggestion generation and energy insights.
+// swiftlint:disable type_body_length
 
 import XCTest
 @testable import homekitauto
@@ -247,9 +248,12 @@ final class HomeAnalyzerTests: XCTestCase {
 
     // MARK: - Energy Insights Edge Cases
 
+    // swiftlint:disable:next line_length
+    typealias RoomFixture = (name: String, accessories: [(name: String, category: String, characteristics: [(type: String, value: AnyCodableValue)])])
+
     func testEnergyInsightsManyActiveDevices() {
         // >5 active devices should trigger the "consider if they all need to be on" warning
-        let rooms: [(name: String, accessories: [(name: String, category: String, characteristics: [(type: String, value: AnyCodableValue)])])] = (1...7).map { i in
+        let rooms: [RoomFixture] = (1...7).map { i in
             (
                 name: "Room \(i)",
                 accessories: [

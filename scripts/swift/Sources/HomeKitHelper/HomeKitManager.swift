@@ -485,39 +485,60 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     /// This table is the source of truth for names used in CLI commands and JSON responses.
     /// Common characteristics: "power", "brightness", "hue", "saturation", "temperature" variants,
     /// "lockState", "position" variants, "motionDetected", "contactState", "batteryLevel", etc.
+    // MARK: - Characteristic & Category Mappings
+
+    /// Lookup table from HomeKit characteristic UUID to friendly name.
+    private static let characteristicTypeNames: [String: String] = [
+        HMCharacteristicTypePowerState: "power",
+        HMCharacteristicTypeBrightness: "brightness",
+        HMCharacteristicTypeHue: "hue",
+        HMCharacteristicTypeSaturation: "saturation",
+        HMCharacteristicTypeColorTemperature: "colorTemperature",
+        HMCharacteristicTypeTargetTemperature: "targetTemperature",
+        HMCharacteristicTypeCurrentTemperature: "currentTemperature",
+        HMCharacteristicTypeTargetHeatingCooling: "hvacMode",
+        HMCharacteristicTypeCurrentHeatingCooling: "currentHeatingCoolingState",
+        HMCharacteristicTypeLockMechanismTargetState: "lockState",
+        HMCharacteristicTypeLockMechanismCurrentState: "currentLockState",
+        HMCharacteristicTypeTargetDoorState: "targetPosition",
+        HMCharacteristicTypeCurrentDoorState: "currentPosition",
+        HMCharacteristicTypeTargetPosition: "targetPosition",
+        HMCharacteristicTypeCurrentPosition: "currentPosition",
+        HMCharacteristicTypeRotationSpeed: "rotationSpeed",
+        HMCharacteristicTypeRotationDirection: "rotationDirection",
+        HMCharacteristicTypeSwingMode: "swingMode",
+        HMCharacteristicTypeActive: "active",
+        HMCharacteristicTypeMotionDetected: "motionDetected",
+        HMCharacteristicTypeContactState: "contactState",
+        HMCharacteristicTypeBatteryLevel: "batteryLevel",
+        HMCharacteristicTypeTargetRelativeHumidity: "targetHumidity",
+        HMCharacteristicTypeCurrentRelativeHumidity: "currentHumidity",
+        HMCharacteristicTypeCurrentLightLevel: "lightLevel"
+    ]
+
+    /// Converts a HomeKit characteristic UUID to a friendly name.
     /// - Parameters:
     ///   - type: HomeKit characteristic UUID constant (e.g., HMCharacteristicTypePowerState)
     /// - Returns: Friendly name (e.g., "power") or the UUID itself if unmapped
     private func characteristicTypeName(_ type: String) -> String {
-        switch type {
-        case HMCharacteristicTypePowerState: return "power"
-        case HMCharacteristicTypeBrightness: return "brightness"
-        case HMCharacteristicTypeHue: return "hue"
-        case HMCharacteristicTypeSaturation: return "saturation"
-        case HMCharacteristicTypeColorTemperature: return "colorTemperature"
-        case HMCharacteristicTypeTargetTemperature: return "targetTemperature"
-        case HMCharacteristicTypeCurrentTemperature: return "currentTemperature"
-        case HMCharacteristicTypeTargetHeatingCooling: return "hvacMode"
-        case HMCharacteristicTypeCurrentHeatingCooling: return "currentHeatingCoolingState"
-        case HMCharacteristicTypeLockMechanismTargetState: return "lockState"
-        case HMCharacteristicTypeLockMechanismCurrentState: return "currentLockState"
-        case HMCharacteristicTypeTargetDoorState: return "targetPosition"
-        case HMCharacteristicTypeCurrentDoorState: return "currentPosition"
-        case HMCharacteristicTypeTargetPosition: return "targetPosition"
-        case HMCharacteristicTypeCurrentPosition: return "currentPosition"
-        case HMCharacteristicTypeRotationSpeed: return "rotationSpeed"
-        case HMCharacteristicTypeRotationDirection: return "rotationDirection"
-        case HMCharacteristicTypeSwingMode: return "swingMode"
-        case HMCharacteristicTypeActive: return "active"
-        case HMCharacteristicTypeMotionDetected: return "motionDetected"
-        case HMCharacteristicTypeContactState: return "contactState"
-        case HMCharacteristicTypeBatteryLevel: return "batteryLevel"
-        case HMCharacteristicTypeTargetRelativeHumidity: return "targetHumidity"
-        case HMCharacteristicTypeCurrentRelativeHumidity: return "currentHumidity"
-        case HMCharacteristicTypeCurrentLightLevel: return "lightLevel"
-        default: return type
-        }
+        Self.characteristicTypeNames[type] ?? type
     }
+
+    /// Lookup table from friendly name to HomeKit characteristic UUID.
+    private static let characteristicUUIDs: [String: String] = [
+        "power": HMCharacteristicTypePowerState,
+        "brightness": HMCharacteristicTypeBrightness,
+        "hue": HMCharacteristicTypeHue,
+        "saturation": HMCharacteristicTypeSaturation,
+        "colorTemperature": HMCharacteristicTypeColorTemperature,
+        "targetTemperature": HMCharacteristicTypeTargetTemperature,
+        "hvacMode": HMCharacteristicTypeTargetHeatingCooling,
+        "lockState": HMCharacteristicTypeLockMechanismTargetState,
+        "targetPosition": HMCharacteristicTypeTargetPosition,
+        "rotationSpeed": HMCharacteristicTypeRotationSpeed,
+        "active": HMCharacteristicTypeActive,
+        "targetHumidity": HMCharacteristicTypeTargetRelativeHumidity
+    ]
 
     /// Reverse mapping: converts friendly names back to HomeKit characteristic UUIDs.
     /// Used when parsing CLI commands that reference characteristics by friendly names.
@@ -525,22 +546,23 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     ///   - name: Friendly name (e.g., "power", "brightness", "lockState")
     /// - Returns: HomeKit characteristic UUID constant or the name itself if unmapped
     private func characteristicUUID(for name: String) -> String {
-        switch name {
-        case "power": return HMCharacteristicTypePowerState
-        case "brightness": return HMCharacteristicTypeBrightness
-        case "hue": return HMCharacteristicTypeHue
-        case "saturation": return HMCharacteristicTypeSaturation
-        case "colorTemperature": return HMCharacteristicTypeColorTemperature
-        case "targetTemperature": return HMCharacteristicTypeTargetTemperature
-        case "hvacMode": return HMCharacteristicTypeTargetHeatingCooling
-        case "lockState": return HMCharacteristicTypeLockMechanismTargetState
-        case "targetPosition": return HMCharacteristicTypeTargetPosition
-        case "rotationSpeed": return HMCharacteristicTypeRotationSpeed
-        case "active": return HMCharacteristicTypeActive
-        case "targetHumidity": return HMCharacteristicTypeTargetRelativeHumidity
-        default: return name
-        }
+        Self.characteristicUUIDs[name] ?? name
     }
+
+    /// Lookup table from accessory category type to display name.
+    private static let categoryNames: [String: String] = [
+        HMAccessoryCategoryTypeLightbulb: "light",
+        HMAccessoryCategoryTypeThermostat: "thermostat",
+        HMAccessoryCategoryTypeDoorLock: "lock",
+        HMAccessoryCategoryTypeGarageDoorOpener: "garageDoor",
+        HMAccessoryCategoryTypeFan: "fan",
+        HMAccessoryCategoryTypeWindowCovering: "windowCovering",
+        HMAccessoryCategoryTypeSwitch: "switch",
+        HMAccessoryCategoryTypeOutlet: "outlet",
+        HMAccessoryCategoryTypeSensor: "sensor",
+        HMAccessoryCategoryTypeDoor: "door",
+        HMAccessoryCategoryTypeWindow: "window"
+    ]
 
     /// Maps HomeKit accessory categories to display names.
     /// Categories help CLI tools categorize devices (e.g., "light", "thermostat", "lock").
@@ -548,20 +570,7 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
     ///   - category: The HMAccessoryCategory from a device
     /// - Returns: Friendly category name or the raw category type if unmapped
     private func categoryName(_ category: HMAccessoryCategory) -> String {
-        switch category.categoryType {
-        case HMAccessoryCategoryTypeLightbulb: return "light"
-        case HMAccessoryCategoryTypeThermostat: return "thermostat"
-        case HMAccessoryCategoryTypeDoorLock: return "lock"
-        case HMAccessoryCategoryTypeGarageDoorOpener: return "garageDoor"
-        case HMAccessoryCategoryTypeFan: return "fan"
-        case HMAccessoryCategoryTypeWindowCovering: return "windowCovering"
-        case HMAccessoryCategoryTypeSwitch: return "switch"
-        case HMAccessoryCategoryTypeOutlet: return "outlet"
-        case HMAccessoryCategoryTypeSensor: return "sensor"
-        case HMAccessoryCategoryTypeDoor: return "door"
-        case HMAccessoryCategoryTypeWindow: return "window"
-        default: return category.categoryType
-        }
+        Self.categoryNames[category.categoryType] ?? category.categoryType
     }
 }
 

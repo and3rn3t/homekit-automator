@@ -327,76 +327,17 @@ struct AutomationEdit: AsyncParsableCommand {
             automation.description = description
         }
 
-        // Decode updated actions, trigger, and conditions if provided
-        let decoder = JSONDecoder()
-        var updatedActions = automation.actions
-        var updatedTrigger = automation.trigger
-        var updatedConditions = automation.conditions
-
-        if let actionsValue = changesDict["actions"] {
-            let actionsData = try JSONSerialization.data(withJSONObject: actionsValue)
-            do {
-                updatedActions = try decoder.decode([AutomationAction].self, from: actionsData)
-            } catch {
-                throw ValidationError("Invalid actions format: \(error.localizedDescription)")
-            }
-        }
-
-        if let triggerValue = changesDict["trigger"] {
-            let triggerData = try JSONSerialization.data(withJSONObject: triggerValue)
-            do {
-                updatedTrigger = try decoder.decode(AutomationTrigger.self, from: triggerData)
-            } catch {
-                throw ValidationError("Invalid trigger format: \(error.localizedDescription)")
-            }
-        }
-
-        if let conditionsValue = changesDict["conditions"] {
-            let conditionsData = try JSONSerialization.data(withJSONObject: conditionsValue)
-            do {
-                updatedConditions = try decoder.decode(
-                    [AutomationCondition].self, from: conditionsData)
-            } catch {
-                throw ValidationError("Invalid conditions format: \(error.localizedDescription)")
-            }
-        }
-
-        // Validate updated actions and trigger against device map
-        if changesDict["actions"] != nil || changesDict["trigger"] != nil {
-            let client = SocketClient()
-            let discoverResponse = try await client.send(command: "discover")
-            if discoverResponse.isOk {
-                let validator = AutomationValidator()
-                let deviceMap = extractDeviceMap(from: discoverResponse)
-
-                if changesDict["actions"] != nil {
-                    do {
-                        try validator.validateActions(updatedActions, deviceMap: deviceMap)
-                    } catch {
-                        print("Validation failed: \(error.localizedDescription)")
-                        throw ExitCode.validationFailure
-                    }
-                }
-
-                if changesDict["trigger"] != nil {
-                    do {
-                        try validator.validateTrigger(updatedTrigger)
-                    } catch {
-                        print("Validation failed: \(error.localizedDescription)")
-                        throw ExitCode.validationFailure
-                    }
-                }
-            }
-        }
+        // Decode and validate changes
+        let decoded = try await decodeAndValidateChanges(changesDict, automation: automation)
 
         // Reconstruct automation with updated fields (trigger/actions/conditions are let properties)
         automation = RegisteredAutomation(
             id: automation.id,
             name: automation.name,
             description: automation.description,
-            trigger: updatedTrigger,
-            conditions: updatedConditions,
-            actions: updatedActions,
+            trigger: decoded.trigger,
+            conditions: decoded.conditions,
+            actions: decoded.actions,
             enabled: automation.enabled,
             shortcutName: automation.shortcutName,
             createdAt: automation.createdAt,
@@ -427,6 +368,73 @@ struct AutomationEdit: AsyncParsableCommand {
         try await registry.update(automation)
 
         try printJSON(automation)
+    }
+
+    /// Decodes updated actions, trigger, and conditions from a changes dictionary,
+    /// validates them against the device map, and returns the decoded values.
+    private func decodeAndValidateChanges(
+        _ changesDict: [String: Any],
+        automation: RegisteredAutomation
+    ) async throws -> (actions: [AutomationAction], trigger: AutomationTrigger, conditions: [AutomationCondition]?) {
+        let decoder = JSONDecoder()
+        var updatedActions = automation.actions
+        var updatedTrigger = automation.trigger
+        var updatedConditions = automation.conditions
+
+        if let actionsValue = changesDict["actions"] {
+            let actionsData = try JSONSerialization.data(withJSONObject: actionsValue)
+            do {
+                updatedActions = try decoder.decode([AutomationAction].self, from: actionsData)
+            } catch {
+                throw ValidationError("Invalid actions format: \(error.localizedDescription)")
+            }
+        }
+
+        if let triggerValue = changesDict["trigger"] {
+            let triggerData = try JSONSerialization.data(withJSONObject: triggerValue)
+            do {
+                updatedTrigger = try decoder.decode(AutomationTrigger.self, from: triggerData)
+            } catch {
+                throw ValidationError("Invalid trigger format: \(error.localizedDescription)")
+            }
+        }
+
+        if let conditionsValue = changesDict["conditions"] {
+            let conditionsData = try JSONSerialization.data(withJSONObject: conditionsValue)
+            do {
+                updatedConditions = try decoder.decode([AutomationCondition].self, from: conditionsData)
+            } catch {
+                throw ValidationError("Invalid conditions format: \(error.localizedDescription)")
+            }
+        }
+
+        // Validate updated actions and trigger against device map
+        if changesDict["actions"] != nil || changesDict["trigger"] != nil {
+            let client = SocketClient()
+            let discoverResponse = try await client.send(command: "discover")
+            if discoverResponse.isOk {
+                let validator = AutomationValidator()
+                let deviceMap = extractDeviceMap(from: discoverResponse)
+                if changesDict["actions"] != nil {
+                    do {
+                        try validator.validateActions(updatedActions, deviceMap: deviceMap)
+                    } catch {
+                        print("Validation failed: \(error.localizedDescription)")
+                        throw ExitCode.validationFailure
+                    }
+                }
+                if changesDict["trigger"] != nil {
+                    do {
+                        try validator.validateTrigger(updatedTrigger)
+                    } catch {
+                        print("Validation failed: \(error.localizedDescription)")
+                        throw ExitCode.validationFailure
+                    }
+                }
+            }
+        }
+
+        return (updatedActions, updatedTrigger, updatedConditions)
     }
 }
 
@@ -568,123 +576,23 @@ struct AutomationTest: AsyncParsableCommand {
         }
 
         // Evaluate conditions before executing actions
-        var conditionResults: [[String: AnyCodableValue]] = []
-        var conditionsAllMet = true
-
-        if !conditionsToCheck.isEmpty {
-            // Attempt to load user-configured lat/long from config for solar calculations.
-            // Falls back to SolarCalculator defaults (San Francisco) if not configured.
-            var lat = SolarCalculator.default.latitude
-            var lon = SolarCalculator.default.longitude
-            if let configResponse = try? await client.send(command: "get_config"),
-                configResponse.isOk,
-                let configData = configResponse.data?.dictionaryValue
-            {
-                if let userLat = configData["latitude"]?.doubleValue {
-                    lat = userLat
-                }
-                if let userLon = configData["longitude"]?.doubleValue {
-                    lon = userLon
-                }
-            }
-
-            let evaluator = ConditionEvaluator(latitude: lat, longitude: lon)
-            let evalResult = try await evaluator.evaluate(
-                conditions: conditionsToCheck, using: client)
-            conditionsAllMet = evalResult.allMet
-
-            for r in evalResult.results {
-                conditionResults.append([
-                    "condition": .string(r.condition.humanReadable),
-                    "type": .string(r.condition.type),
-                    "met": .bool(r.met),
-                    "reason": .string(r.reason),
-                ])
-            }
-
-            if !conditionsAllMet && !force {
-                // Conditions not met and --force not set — report and exit
-                let output: [String: AnyCodableValue] = [
-                    "tested": .string(name ?? id ?? "ad-hoc"),
-                    "conditionsEvaluated": .array(conditionResults.map { .dictionary($0) }),
-                    "conditionsMet": .bool(false),
-                    "skipped": .bool(true),
-                    "reason": .string("Conditions not met. Use --force to execute anyway."),
-                ]
-                try printJSON(output)
-                return
-            }
+        let conditionEval = try await evaluateConditions(
+            conditionsToCheck, using: client, force: force
+        )
+        if let earlyOutput = conditionEval.earlyExitOutput {
+            try printJSON(earlyOutput)
+            return
         }
 
-        // Execute each action sequentially and collect results
-        var results: [[String: AnyCodableValue]] = []
-
-        for action in actionsToTest {
-            // Wait for delay specified in action (if any) — skip in dry-run
-            if action.delaySeconds > 0 && !dryRun {
-                try await Task.sleep(nanoseconds: UInt64(action.delaySeconds) * 1_000_000_000)
-            }
-
-            // In dry-run mode, report what would happen without executing
-            if dryRun {
-                if action.type == "scene" {
-                    let sceneName = action.sceneName ?? "Unknown"
-                    results.append([
-                        "device": .string(sceneName),
-                        "action": .string("trigger scene"),
-                        "dryRun": .bool(true),
-                        "success": .bool(true),
-                    ])
-                } else {
-                    results.append([
-                        "device": .string(action.deviceName),
-                        "action": .string("\(action.characteristic) -> \(action.value)"),
-                        "dryRun": .bool(true),
-                        "success": .bool(true),
-                    ])
-                }
-                continue
-            }
-
-            // Handle scene actions (trigger_scene command)
-            if action.type == "scene" {
-                let sceneName = action.sceneName ?? "Unknown"
-                let response = try await client.send(
-                    command: "trigger_scene",
-                    params: ["name": .string(sceneName)]
-                )
-                results.append([
-                    "device": .string(sceneName),
-                    "action": .string("trigger scene"),
-                    "success": .bool(response.isOk),
-                    "error": response.error.map { .string($0) } ?? .null,
-                ])
-                continue
-            }
-
-            // Handle regular device characteristic actions (set_device command)
-            let response = try await client.send(
-                command: "set_device",
-                params: [
-                    "uuid": .string(action.deviceUuid),
-                    "characteristic": .string(action.characteristic),
-                    "value": action.value,
-                ]
-            )
-
-            results.append([
-                "device": .string(action.deviceName),
-                "action": .string("\(action.characteristic) -> \(action.value)"),
-                "success": .bool(response.isOk),
-                "error": response.error.map { .string($0) } ?? .null,
-            ])
-        }
+        // Execute actions and build output
+        let results = try await executeActions(
+            actionsToTest, dryRun: dryRun, using: client
+        )
 
         // Summarize results
         let succeeded = results.filter { $0["success"]?.boolValue == true }.count
         let failed = results.count - succeeded
 
-        // Output test results (include condition evaluation if any)
         var output: [String: AnyCodableValue] = [
             "tested": .string(name ?? id ?? "ad-hoc"),
             "results": .array(results.map { .dictionary($0) }),
@@ -694,15 +602,108 @@ struct AutomationTest: AsyncParsableCommand {
         if dryRun {
             output["dryRun"] = .bool(true)
         }
-        if !conditionResults.isEmpty {
-            output["conditionsEvaluated"] = .array(conditionResults.map { .dictionary($0) })
-            output["conditionsMet"] = .bool(conditionsAllMet)
-            if !conditionsAllMet && force {
+        if !conditionEval.results.isEmpty {
+            output["conditionsEvaluated"] = .array(conditionEval.results.map { .dictionary($0) })
+            output["conditionsMet"] = .bool(conditionEval.allMet)
+            if !conditionEval.allMet && force {
                 output["forcedExecution"] = .bool(true)
             }
         }
 
         try printJSON(output)
+    }
+
+    /// Evaluates automation conditions, returning results and an optional early-exit output
+    /// if conditions are not met and `--force` is not set.
+    private func evaluateConditions(
+        _ conditions: [AutomationCondition],
+        using client: SocketClient,
+        force: Bool
+    ) async throws -> (
+        results: [[String: AnyCodableValue]], allMet: Bool,
+        earlyExitOutput: [String: AnyCodableValue]?
+    ) {
+        guard !conditions.isEmpty else {
+            return ([], true, nil)
+        }
+
+        var lat = SolarCalculator.default.latitude
+        var lon = SolarCalculator.default.longitude
+        if let configResponse = try? await client.send(command: "get_config"),
+            configResponse.isOk,
+            let configData = configResponse.data?.dictionaryValue
+        {
+            if let userLat = configData["latitude"]?.doubleValue { lat = userLat }
+            if let userLon = configData["longitude"]?.doubleValue { lon = userLon }
+        }
+
+        let evaluator = ConditionEvaluator(latitude: lat, longitude: lon)
+        let evalResult = try await evaluator.evaluate(conditions: conditions, using: client)
+        let conditionResults = evalResult.results.map { r in
+            [
+                "condition": AnyCodableValue.string(r.condition.humanReadable),
+                "type": AnyCodableValue.string(r.condition.type),
+                "met": AnyCodableValue.bool(r.met),
+                "reason": AnyCodableValue.string(r.reason),
+            ]
+        }
+
+        if !evalResult.allMet && !force {
+            let earlyOutput: [String: AnyCodableValue] = [
+                "tested": .string(name ?? id ?? "ad-hoc"),
+                "conditionsEvaluated": .array(conditionResults.map { .dictionary($0) }),
+                "conditionsMet": .bool(false),
+                "skipped": .bool(true),
+                "reason": .string("Conditions not met. Use --force to execute anyway."),
+            ]
+            return (conditionResults, false, earlyOutput)
+        }
+
+        return (conditionResults, evalResult.allMet, nil)
+    }
+
+    /// Executes automation actions sequentially and collects per-action results.
+    private func executeActions(
+        _ actions: [AutomationAction],
+        dryRun: Bool,
+        using client: SocketClient
+    ) async throws -> [[String: AnyCodableValue]] {
+        var results: [[String: AnyCodableValue]] = []
+        for action in actions {
+            if action.delaySeconds > 0 && !dryRun {
+                try await Task.sleep(nanoseconds: UInt64(action.delaySeconds) * 1_000_000_000)
+            }
+            if dryRun {
+                let device = action.type == "scene" ? (action.sceneName ?? "Unknown") : action.deviceName
+                let actionDesc = action.type == "scene" ? "trigger scene" : "\(action.characteristic) -> \(action.value)"
+                results.append(["device": .string(device), "action": .string(actionDesc), "dryRun": .bool(true), "success": .bool(true)])
+                continue
+            }
+            if action.type == "scene" {
+                let sceneName = action.sceneName ?? "Unknown"
+                let response = try await client.send(command: "trigger_scene", params: ["name": .string(sceneName)])
+                results.append([
+                    "device": .string(sceneName), "action": .string("trigger scene"),
+                    "success": .bool(response.isOk), "error": response.error.map { .string($0) } ?? .null,
+                ])
+                continue
+            }
+            let response = try await client.send(
+                command: "set_device",
+                params: [
+                    "uuid": .string(action.deviceUuid),
+                    "characteristic": .string(action.characteristic),
+                    "value": action.value,
+                ]
+            )
+            results.append([
+                "device": .string(action.deviceName),
+                "action": .string("\(action.characteristic) -> \(action.value)"),
+                "success": .bool(response.isOk),
+                "error": response.error.map { .string($0) } ?? .null,
+            ])
+        }
+        return results
     }
 }
 

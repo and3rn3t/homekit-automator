@@ -1,5 +1,6 @@
 // ShortcutGeneratorTests.swift
 // Tests for ShortcutGenerator plist generation and structure validation.
+// swiftlint:disable force_cast
 
 import XCTest
 @testable import homekitauto

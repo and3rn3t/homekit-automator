@@ -1,6 +1,7 @@
 // ValidationTests.swift
 // Comprehensive tests for the validation pipeline: device existence, characteristic support,
 // value ranges, cron expressions, and duplicate name enforcement.
+// swiftlint:disable type_body_length
 
 import XCTest
 @testable import homekitauto

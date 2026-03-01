@@ -45,6 +45,63 @@ struct HomeAnalyzer {
     /// Optional category filter to focus suggestion generation on a specific domain.
     let focus: String?
 
+    // MARK: - Device Categorization
+
+    /// Grouped devices collected from the HomeKit device map, organized by category.
+    private struct DeviceGroups {
+        var lights: [(name: String, room: String)] = []
+        var locks: [(name: String, room: String)] = []
+        var thermostats: [(name: String, room: String)] = []
+        var motionSensors: [(name: String, room: String)] = []
+        var contactSensors: [(name: String, room: String)] = []
+        var garageDoors: [(name: String, room: String)] = []
+        var windowCoverings: [(name: String, room: String)] = []
+
+        var hasThermostats: Bool { !thermostats.isEmpty }
+        var hasLights: Bool { !lights.isEmpty }
+        var hasWindowCoverings: Bool { !windowCoverings.isEmpty }
+    }
+
+    /// Traverses the device map and groups accessories by category.
+    private func collectDevices() -> DeviceGroups {
+        var groups = DeviceGroups()
+        guard let homes = deviceMap?.dictionaryValue?["homes"]?.arrayValue else {
+            return groups
+        }
+        for home in homes {
+            guard let rooms = home.dictionaryValue?["rooms"]?.arrayValue else { continue }
+            for room in rooms {
+                guard let roomName = room.dictionaryValue?["name"]?.stringValue,
+                    let accessories = room.dictionaryValue?["accessories"]?.arrayValue
+                else { continue }
+                for accessory in accessories {
+                    guard let name = accessory.dictionaryValue?["name"]?.stringValue,
+                        let category = accessory.dictionaryValue?["category"]?.stringValue
+                    else { continue }
+                    switch category {
+                    case "light", "lightbulb":
+                        groups.lights.append((name, roomName))
+                    case "lock", "doorLock":
+                        groups.locks.append((name, roomName))
+                    case "thermostat":
+                        groups.thermostats.append((name, roomName))
+                    case "motionSensor":
+                        groups.motionSensors.append((name, roomName))
+                    case "contactSensor":
+                        groups.contactSensors.append((name, roomName))
+                    case "garageDoor", "garageDoorOpener":
+                        groups.garageDoors.append((name, roomName))
+                    case "windowCovering":
+                        groups.windowCoverings.append((name, roomName))
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+        return groups
+    }
+
     // MARK: - Suggestion Generation
 
     /// Generates automation suggestions by analyzing the device map and avoiding duplicates.
@@ -69,158 +126,139 @@ struct HomeAnalyzer {
     /// - Returns: An array of `AutomationSuggestion` objects ordered by evaluation sequence
     ///           (security → comfort → convenience → energy).
     func generateSuggestions() -> [AutomationSuggestion] {
-        var suggestions: [AutomationSuggestion] = []
-
-        guard let homes = deviceMap?.dictionaryValue?["homes"]?.arrayValue else {
-            return suggestions
-        }
-
-        // Collect all devices by category
-        var lights: [(name: String, room: String)] = []
-        var locks: [(name: String, room: String)] = []
-        var thermostats: [(name: String, room: String)] = []
-        var motionSensors: [(name: String, room: String)] = []
-        var contactSensors: [(name: String, room: String)] = []
-        var garageDoors: [(name: String, room: String)] = []
-
-        for home in homes {
-            guard let rooms = home.dictionaryValue?["rooms"]?.arrayValue else { continue }
-            for room in rooms {
-                guard let roomName = room.dictionaryValue?["name"]?.stringValue,
-                      let accessories = room.dictionaryValue?["accessories"]?.arrayValue else { continue }
-
-                for accessory in accessories {
-                    guard let name = accessory.dictionaryValue?["name"]?.stringValue,
-                          let category = accessory.dictionaryValue?["category"]?.stringValue else { continue }
-
-                    switch category {
-                    case "light", "lightbulb":
-                        lights.append((name, roomName))
-                    case "lock", "doorLock":
-                        locks.append((name, roomName))
-                    case "thermostat":
-                        thermostats.append((name, roomName))
-                    case "motionSensor":
-                        motionSensors.append((name, roomName))
-                    case "contactSensor":
-                        contactSensors.append((name, roomName))
-                    case "garageDoor", "garageDoorOpener":
-                        garageDoors.append((name, roomName))
-                    default:
-                        break
-                    }
-                }
-            }
-        }
-
+        let devices = collectDevices()
         let existingNames = Swift.Set(existingAutomations.map { $0.name.lowercased() })
 
-        // MARK: Security Suggestions
-        /// Suggests security-focused automations: nighttime locks and garage door closures.
-        /// These automations protect against unauthorized access during sleeping hours.
-        // Security suggestions
+        var suggestions: [AutomationSuggestion] = []
         if focus == nil || focus == "security" {
-            if !locks.isEmpty && !existingNames.contains("auto-lock at night") {
-                suggestions.append(AutomationSuggestion(
+            suggestions += securitySuggestions(devices: devices, existingNames: existingNames)
+        }
+        if focus == nil || focus == "comfort" {
+            suggestions += comfortSuggestions(devices: devices, existingNames: existingNames)
+        }
+        if focus == nil || focus == "convenience" {
+            suggestions += convenienceSuggestions(devices: devices, existingNames: existingNames)
+        }
+        if focus == nil || focus == "energy" {
+            suggestions += energySuggestions(devices: devices, existingNames: existingNames)
+        }
+        return suggestions
+    }
+
+    // MARK: Security Suggestions
+    /// Suggests security-focused automations: nighttime locks and garage door closures.
+    private func securitySuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>)
+        -> [AutomationSuggestion]
+    {
+        var suggestions: [AutomationSuggestion] = []
+        if !devices.locks.isEmpty && !existingNames.contains("auto-lock at night") {
+            suggestions.append(
+                AutomationSuggestion(
                     name: "Auto-lock at Night",
-                    reason: "You have \(locks.count) smart lock(s) but no nighttime locking automation",
+                    reason:
+                        "You have \(devices.locks.count) smart lock(s) but no nighttime locking automation",
                     trigger: "daily at 10:00 PM",
-                    actions: locks.map { "\($0.name) -> locked" },
+                    actions: devices.locks.map { "\($0.name) -> locked" },
                     category: "security"
                 ))
-            }
-
-            if !garageDoors.isEmpty && !existingNames.contains("close garage at night") {
-                suggestions.append(AutomationSuggestion(
+        }
+        if !devices.garageDoors.isEmpty && !existingNames.contains("close garage at night") {
+            suggestions.append(
+                AutomationSuggestion(
                     name: "Close Garage at Night",
                     reason: "Your garage door has no nighttime close automation",
                     trigger: "daily at 9:00 PM",
-                    actions: garageDoors.map { "\($0.name) -> closed" },
+                    actions: devices.garageDoors.map { "\($0.name) -> closed" },
                     category: "security"
                 ))
-            }
         }
+        return suggestions
+    }
 
-        // MARK: Comfort Suggestions
-        /// Suggests comfort-focused automations: morning temperature adjustment and sleep-optimized cooling.
-        /// These automations ensure environmental conditions support daily routines and sleep quality.
-        // Comfort suggestions
-        if focus == nil || focus == "comfort" {
-            if !thermostats.isEmpty && !existingNames.contains("morning warmup") {
-                suggestions.append(AutomationSuggestion(
+    // MARK: Comfort Suggestions
+    /// Suggests comfort-focused automations: morning temperature adjustment and sleep-optimized cooling.
+    private func comfortSuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>)
+        -> [AutomationSuggestion]
+    {
+        var suggestions: [AutomationSuggestion] = []
+        if !devices.thermostats.isEmpty && !existingNames.contains("morning warmup") {
+            suggestions.append(
+                AutomationSuggestion(
                     name: "Morning Warmup",
                     reason: "No morning temperature automation found for your thermostat",
                     trigger: "weekdays at 6:30 AM",
-                    actions: thermostats.map { "\($0.name) -> heat to 72 F" },
+                    actions: devices.thermostats.map { "\($0.name) -> heat to 72 F" },
                     category: "comfort"
                 ))
-            }
-
-            if !thermostats.isEmpty && !existingNames.contains("sleep temperature") {
-                suggestions.append(AutomationSuggestion(
+        }
+        if !devices.thermostats.isEmpty && !existingNames.contains("sleep temperature") {
+            suggestions.append(
+                AutomationSuggestion(
                     name: "Sleep Temperature",
                     reason: "Setting a cooler temperature at night can improve sleep quality",
                     trigger: "daily at 10:00 PM",
-                    actions: thermostats.map { "\($0.name) -> cool to 67 F" },
+                    actions: devices.thermostats.map { "\($0.name) -> cool to 67 F" },
                     category: "comfort"
                 ))
-            }
         }
+        return suggestions
+    }
 
-        // MARK: Convenience Suggestions
-        /// Suggests convenience-focused automations: motion-triggered lighting and bulk control routines.
-        /// These automations reduce manual interaction by automating common user actions.
-        // Convenience suggestions
-        if focus == nil || focus == "convenience" {
-            /// Motion-activated lights: For each motion sensor, suggest pairing it with lights in the same room.
-            /// Checks if the room has both a motion sensor and lights, and whether they're already connected.
-            for sensor in motionSensors {
-                let roomLights = lights.filter { $0.room == sensor.room }
-                if !roomLights.isEmpty {
-                    let suggestionName = "Motion-Activated \(sensor.room) Lights"
-                    if !existingNames.contains(suggestionName.lowercased()) {
-                        suggestions.append(AutomationSuggestion(
+    // MARK: Convenience Suggestions
+    /// Suggests convenience-focused automations: motion-triggered lighting and bulk control routines.
+    private func convenienceSuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>)
+        -> [AutomationSuggestion]
+    {
+        var suggestions: [AutomationSuggestion] = []
+        for sensor in devices.motionSensors {
+            let roomLights = devices.lights.filter { $0.room == sensor.room }
+            if !roomLights.isEmpty {
+                let suggestionName = "Motion-Activated \(sensor.room) Lights"
+                if !existingNames.contains(suggestionName.lowercased()) {
+                    suggestions.append(
+                        AutomationSuggestion(
                             name: suggestionName,
-                            reason: "\(sensor.room) has a motion sensor and lights but they're not connected",
+                            reason:
+                                "\(sensor.room) has a motion sensor and lights but they're not connected",
                             trigger: "when \(sensor.name) detects motion",
                             actions: roomLights.map { "\($0.name) -> on, brightness 60%" },
                             category: "convenience"
                         ))
-                    }
                 }
             }
-
-            /// All-off routine: Suggests a bulk off command for homes with multiple lights (3+).
-            /// Useful as a manual trigger for bedtime or leaving the house.
-            if lights.count >= 3 && !existingNames.contains("all lights off") {
-                suggestions.append(AutomationSuggestion(
+        }
+        if devices.lights.count >= 3 && !existingNames.contains("all lights off") {
+            suggestions.append(
+                AutomationSuggestion(
                     name: "All Lights Off",
-                    reason: "Quick way to turn off all \(lights.count) lights when leaving or going to bed",
+                    reason:
+                        "Quick way to turn off all \(devices.lights.count) lights when leaving or going to bed",
                     trigger: "manual (say 'lights off')",
                     actions: ["All lights -> off"],
                     category: "convenience"
                 ))
-            }
         }
+        return suggestions
+    }
 
-        // MARK: Energy Suggestions
-        /// Suggests energy-focused automations: away mode that disables heating/cooling and turns off lights/locks.
-        /// Combines thermostat, lighting, and security actions into a single manual routine for energy savings.
-        // Energy suggestions
-        if focus == nil || focus == "energy" {
-            if !thermostats.isEmpty && !existingNames.contains("away mode") {
-                suggestions.append(AutomationSuggestion(
+    // MARK: Energy Suggestions
+    /// Suggests energy-focused automations: away mode combining thermostat, lighting, and security actions.
+    private func energySuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>)
+        -> [AutomationSuggestion]
+    {
+        var suggestions: [AutomationSuggestion] = []
+        if !devices.thermostats.isEmpty && !existingNames.contains("away mode") {
+            suggestions.append(
+                AutomationSuggestion(
                     name: "Away Mode",
                     reason: "No energy-saving away mode detected — could save on heating/cooling",
                     trigger: "manual (say 'I'm leaving')",
-                    actions: thermostats.map { "\($0.name) -> eco mode (64 F)" } +
-                             lights.map { "\($0.name) -> off" } +
-                             locks.map { "\($0.name) -> locked" },
+                    actions: devices.thermostats.map { "\($0.name) -> eco mode (64 F)" }
+                        + devices.lights.map { "\($0.name) -> off" }
+                        + devices.locks.map { "\($0.name) -> locked" },
                     category: "energy"
                 ))
-            }
         }
-
         return suggestions
     }
 
@@ -236,122 +274,113 @@ struct HomeAnalyzer {
     ///
     /// - Returns: An array of seasonal `AutomationSuggestion` objects.
     func generateSeasonalSuggestions() -> [AutomationSuggestion] {
-        var suggestions: [AutomationSuggestion] = []
-
+        let devices = collectDevices()
+        let existingNames = Swift.Set(existingAutomations.map { $0.name.lowercased() })
         let month = Calendar.current.component(.month, from: Date())
 
-        guard let homes = deviceMap?.dictionaryValue?["homes"]?.arrayValue else {
-            return suggestions
-        }
-
-        // Collect devices for seasonal suggestions
-        var hasThermostats = false
-        var hasLights = false
-        var hasWindowCoverings = false
-
-        for home in homes {
-            guard let rooms = home.dictionaryValue?["rooms"]?.arrayValue else { continue }
-            for room in rooms {
-                guard let accessories = room.dictionaryValue?["accessories"]?.arrayValue else { continue }
-                for accessory in accessories {
-                    guard let category = accessory.dictionaryValue?["category"]?.stringValue else { continue }
-                    switch category {
-                    case "thermostat": hasThermostats = true
-                    case "light", "lightbulb": hasLights = true
-                    case "windowCovering": hasWindowCoverings = true
-                    default: break
-                    }
-                }
-            }
-        }
-
-        let existingNames = Swift.Set(existingAutomations.map { $0.name.lowercased() })
-
         switch month {
-        case 12, 1, 2: // Winter
-            if hasThermostats && !existingNames.contains("winter heating schedule") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Winter Heating Schedule",
-                    reason: "Cold months detected — a heating schedule can keep your home warm efficiently",
-                    trigger: "weekdays at 6:00 AM",
-                    actions: ["Thermostat -> heat to 72°F", "Thermostat -> eco mode at 10 PM"],
-                    category: "comfort"
-                ))
-            }
-            if hasLights && !existingNames.contains("holiday lighting") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Holiday Lighting",
-                    reason: "Winter season — schedule festive lighting for evenings",
-                    trigger: "daily at sunset",
-                    actions: ["Outdoor lights -> on", "Accent lights -> holiday color"],
-                    category: "convenience"
-                ))
-            }
-
-        case 3, 4, 5: // Spring
-            if hasThermostats && !existingNames.contains("spring ventilation reminder") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Spring Ventilation Reminder",
-                    reason: "Spring air quality can benefit from regular ventilation",
-                    trigger: "daily at 10:00 AM",
-                    actions: ["Thermostat -> fan mode", "Notification -> open windows for fresh air"],
-                    category: "comfort"
-                ))
-            }
-            if hasWindowCoverings && !existingNames.contains("allergy-aware windows") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Allergy-Aware Windows",
-                    reason: "Spring pollen season — close coverings during peak pollen hours",
-                    trigger: "daily at 10:00 AM",
-                    actions: ["Window coverings -> closed (10 AM - 4 PM)"],
-                    category: "comfort"
-                ))
-            }
-
-        case 6, 7, 8: // Summer
-            if hasThermostats && !existingNames.contains("summer cooling schedule") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Summer Cooling Schedule",
-                    reason: "Hot months — optimize cooling to save energy while staying comfortable",
-                    trigger: "daily at 2:00 PM",
-                    actions: ["Thermostat -> cool to 76°F (peak hours)", "Thermostat -> cool to 72°F (evening)"],
-                    category: "energy"
-                ))
-            }
-            if hasWindowCoverings && !existingNames.contains("summer shade control") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Summer Shade Control",
-                    reason: "Close shades during afternoon sun to reduce cooling load",
-                    trigger: "daily at 12:00 PM",
-                    actions: ["Window coverings -> closed (noon - 5 PM)", "Window coverings -> open (evening)"],
-                    category: "energy"
-                ))
-            }
-
-        case 9, 10, 11: // Fall
-            if hasThermostats && !existingNames.contains("fall transition schedule") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Fall Transition Schedule",
-                    reason: "Transitional weather — adjust heating/cooling for fluctuating temperatures",
-                    trigger: "daily at 7:00 AM",
-                    actions: ["Thermostat -> auto mode 68-74°F"],
-                    category: "comfort"
-                ))
-            }
-            if hasLights && !existingNames.contains("early darkness lights") {
-                suggestions.append(AutomationSuggestion(
-                    name: "Early Darkness Lights",
-                    reason: "Days are getting shorter — turn on lights earlier",
-                    trigger: "daily at sunset",
-                    actions: ["Indoor lights -> on at 50% brightness", "Outdoor lights -> on"],
-                    category: "convenience"
-                ))
-            }
-
+        case 12, 1, 2:
+            return winterSuggestions(devices: devices, existingNames: existingNames)
+        case 3, 4, 5:
+            return springSuggestions(devices: devices, existingNames: existingNames)
+        case 6, 7, 8:
+            return summerSuggestions(devices: devices, existingNames: existingNames)
+        case 9, 10, 11:
+            return fallSuggestions(devices: devices, existingNames: existingNames)
         default:
-            break
+            return []
         }
+    }
 
+    private func winterSuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>) -> [AutomationSuggestion] {
+        var suggestions: [AutomationSuggestion] = []
+        if devices.hasThermostats && !existingNames.contains("winter heating schedule") {
+            suggestions.append(AutomationSuggestion(
+                name: "Winter Heating Schedule",
+                reason: "Cold months detected — a heating schedule can keep your home warm efficiently",
+                trigger: "weekdays at 6:00 AM",
+                actions: ["Thermostat -> heat to 72°F", "Thermostat -> eco mode at 10 PM"],
+                category: "comfort"
+            ))
+        }
+        if devices.hasLights && !existingNames.contains("holiday lighting") {
+            suggestions.append(AutomationSuggestion(
+                name: "Holiday Lighting",
+                reason: "Winter season — schedule festive lighting for evenings",
+                trigger: "daily at sunset",
+                actions: ["Outdoor lights -> on", "Accent lights -> holiday color"],
+                category: "convenience"
+            ))
+        }
+        return suggestions
+    }
+
+    private func springSuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>) -> [AutomationSuggestion] {
+        var suggestions: [AutomationSuggestion] = []
+        if devices.hasThermostats && !existingNames.contains("spring ventilation reminder") {
+            suggestions.append(AutomationSuggestion(
+                name: "Spring Ventilation Reminder",
+                reason: "Spring air quality can benefit from regular ventilation",
+                trigger: "daily at 10:00 AM",
+                actions: ["Thermostat -> fan mode", "Notification -> open windows for fresh air"],
+                category: "comfort"
+            ))
+        }
+        if devices.hasWindowCoverings && !existingNames.contains("allergy-aware windows") {
+            suggestions.append(AutomationSuggestion(
+                name: "Allergy-Aware Windows",
+                reason: "Spring pollen season — close coverings during peak pollen hours",
+                trigger: "daily at 10:00 AM",
+                actions: ["Window coverings -> closed (10 AM - 4 PM)"],
+                category: "comfort"
+            ))
+        }
+        return suggestions
+    }
+
+    private func summerSuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>) -> [AutomationSuggestion] {
+        var suggestions: [AutomationSuggestion] = []
+        if devices.hasThermostats && !existingNames.contains("summer cooling schedule") {
+            suggestions.append(AutomationSuggestion(
+                name: "Summer Cooling Schedule",
+                reason: "Hot months — optimize cooling to save energy while staying comfortable",
+                trigger: "daily at 2:00 PM",
+                actions: ["Thermostat -> cool to 76°F (peak hours)", "Thermostat -> cool to 72°F (evening)"],
+                category: "energy"
+            ))
+        }
+        if devices.hasWindowCoverings && !existingNames.contains("summer shade control") {
+            suggestions.append(AutomationSuggestion(
+                name: "Summer Shade Control",
+                reason: "Close shades during afternoon sun to reduce cooling load",
+                trigger: "daily at 12:00 PM",
+                actions: ["Window coverings -> closed (noon - 5 PM)", "Window coverings -> open (evening)"],
+                category: "energy"
+            ))
+        }
+        return suggestions
+    }
+
+    private func fallSuggestions(devices: DeviceGroups, existingNames: Swift.Set<String>) -> [AutomationSuggestion] {
+        var suggestions: [AutomationSuggestion] = []
+        if devices.hasThermostats && !existingNames.contains("fall transition schedule") {
+            suggestions.append(AutomationSuggestion(
+                name: "Fall Transition Schedule",
+                reason: "Transitional weather — adjust heating/cooling for fluctuating temperatures",
+                trigger: "daily at 7:00 AM",
+                actions: ["Thermostat -> auto mode 68-74°F"],
+                category: "comfort"
+            ))
+        }
+        if devices.hasLights && !existingNames.contains("early darkness lights") {
+            suggestions.append(AutomationSuggestion(
+                name: "Early Darkness Lights",
+                reason: "Days are getting shorter — turn on lights earlier",
+                trigger: "daily at sunset",
+                actions: ["Indoor lights -> on at 50% brightness", "Outdoor lights -> on"],
+                category: "convenience"
+            ))
+        }
         return suggestions
     }
 
@@ -373,7 +402,7 @@ struct HomeAnalyzer {
         // Count runs per automation
         var runCounts: [String: Int] = [:]
         var failCounts: [String: Int] = [:]
-        var timesByAutomation: [String: [Int]] = [:] // hours of day
+        var timesByAutomation: [String: [Int]] = [:]  // hours of day
 
         for entry in log {
             runCounts[entry.automationName, default: 0] += 1
@@ -391,13 +420,15 @@ struct HomeAnalyzer {
         for (name, count) in runCounts where count >= 10 {
             let suggestionName = "Optimize \(name) Schedule"
             if !existingNames.contains(suggestionName.lowercased()) {
-                suggestions.append(AutomationSuggestion(
-                    name: suggestionName,
-                    reason: "\(name) has run \(count) times — consider if a fixed schedule would be more efficient",
-                    trigger: "schedule optimization",
-                    actions: ["Review trigger frequency for \(name)"],
-                    category: "energy"
-                ))
+                suggestions.append(
+                    AutomationSuggestion(
+                        name: suggestionName,
+                        reason:
+                            "\(name) has run \(count) times — consider if a fixed schedule would be more efficient",
+                        trigger: "schedule optimization",
+                        actions: ["Review trigger frequency for \(name)"],
+                        category: "energy"
+                    ))
             }
         }
 
@@ -407,13 +438,15 @@ struct HomeAnalyzer {
             if runs >= 3 && Double(fails) / Double(runs) > 0.3 {
                 let suggestionName = "Troubleshoot \(name)"
                 if !existingNames.contains(suggestionName.lowercased()) {
-                    suggestions.append(AutomationSuggestion(
-                        name: suggestionName,
-                        reason: "\(name) fails \(Int(Double(fails) / Double(runs) * 100))% of the time — check device connectivity",
-                        trigger: "maintenance",
-                        actions: ["Verify device reachability", "Check automation conditions"],
-                        category: "convenience"
-                    ))
+                    suggestions.append(
+                        AutomationSuggestion(
+                            name: suggestionName,
+                            reason:
+                                "\(name) fails \(Int(Double(fails) / Double(runs) * 100))% of the time — check device connectivity",
+                            trigger: "maintenance",
+                            actions: ["Verify device reachability", "Check automation conditions"],
+                            category: "convenience"
+                        ))
                 }
             }
         }
@@ -422,17 +455,23 @@ struct HomeAnalyzer {
         for (name, hours) in timesByAutomation where hours.count >= 5 {
             let hourCounts = Dictionary(grouping: hours, by: { $0 }).mapValues { $0.count }
             if let (peakHour, peakCount) = hourCounts.max(by: { $0.value < $1.value }),
-               Double(peakCount) / Double(hours.count) > 0.5 {
+                Double(peakCount) / Double(hours.count) > 0.5
+            {
                 let suggestionName = "Schedule \(name) at \(peakHour):00"
                 if !existingNames.contains(suggestionName.lowercased()) {
-                    let amPm = peakHour >= 12 ? "\(peakHour == 12 ? 12 : peakHour - 12) PM" : "\(peakHour == 0 ? 12 : peakHour) AM"
-                    suggestions.append(AutomationSuggestion(
-                        name: suggestionName,
-                        reason: "You usually run \(name) around \(amPm) — consider making it automatic",
-                        trigger: "daily at \(amPm)",
-                        actions: ["Auto-trigger \(name)"],
-                        category: "convenience"
-                    ))
+                    let amPm =
+                        peakHour >= 12
+                        ? "\(peakHour == 12 ? 12 : peakHour - 12) PM"
+                        : "\(peakHour == 0 ? 12 : peakHour) AM"
+                    suggestions.append(
+                        AutomationSuggestion(
+                            name: suggestionName,
+                            reason:
+                                "You usually run \(name) around \(amPm) — consider making it automatic",
+                            trigger: "daily at \(amPm)",
+                            actions: ["Auto-trigger \(name)"],
+                            category: "convenience"
+                        ))
                 }
             }
         }
@@ -465,7 +504,9 @@ struct HomeAnalyzer {
     ///   - `automationRuns`: Total number of automation executions in the period
     ///   - `mostActiveAutomation`: The automation that ran most frequently (or "none")
     ///   - `insights`: Array of contextual recommendations based on current state and history
-    func generateEnergyInsights(log: [AutomationLogEntry], period: String) -> [String: AnyCodableValue] {
+    func generateEnergyInsights(log: [AutomationLogEntry], period: String) -> [String:
+        AnyCodableValue]
+    {
         var devicesOn: [String] = []
         var insights: [String] = []
 
@@ -476,14 +517,18 @@ struct HomeAnalyzer {
                 guard let rooms = home.dictionaryValue?["rooms"]?.arrayValue else { continue }
                 for room in rooms {
                     guard let roomName = room.dictionaryValue?["name"]?.stringValue,
-                          let accessories = room.dictionaryValue?["accessories"]?.arrayValue else { continue }
+                        let accessories = room.dictionaryValue?["accessories"]?.arrayValue
+                    else { continue }
 
                     for accessory in accessories {
                         guard let name = accessory.dictionaryValue?["name"]?.stringValue,
-                              let chars = accessory.dictionaryValue?["characteristics"]?.arrayValue else { continue }
+                            let chars = accessory.dictionaryValue?["characteristics"]?.arrayValue
+                        else { continue }
 
                         for char in chars {
-                            guard let type = char.dictionaryValue?["type"]?.stringValue else { continue }
+                            guard let type = char.dictionaryValue?["type"]?.stringValue else {
+                                continue
+                            }
 
                             /// Check for power/active characteristics: Identifies devices that are currently on.
                             if type == "power" || type == "active" {
@@ -518,7 +563,9 @@ struct HomeAnalyzer {
         /// Generate contextual insights: Analyzes active device count to surface energy-saving opportunities.
         /// Alerts user if many devices are running simultaneously; congratulates when all are off.
         if devicesOn.count > 5 {
-            insights.append("You have \(devicesOn.count) devices currently active — consider if they all need to be on")
+            insights.append(
+                "You have \(devicesOn.count) devices currently active — consider if they all need to be on"
+            )
         }
 
         if devicesOn.isEmpty {
@@ -532,7 +579,7 @@ struct HomeAnalyzer {
             "mostActiveAutomation": .string(
                 mostActive.map { "\($0.key) (\($0.value) runs)" } ?? "none"
             ),
-            "insights": .array(insights.map { .string($0) })
+            "insights": .array(insights.map { .string($0) }),
         ]
     }
 }
