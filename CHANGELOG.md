@@ -5,6 +5,28 @@ All notable changes to HomeKit Automator are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-03-01
+
+### Fixed
+
+- **CI Pipeline**: Bumped Swift 6.0 → 6.1 and macOS runner 14 → 15 to fix TransferNonSendable compiler crash
+- **CI Pipeline**: Made solar condition tests timezone-deterministic (explicit `America/Los_Angeles`)
+- **CI Pipeline**: Fixed `sync-models.sh` sed filter that was over-stripping `sharedISO8601Formatter` usage
+- **CI Pipeline**: Resolved all 148 SwiftLint `--strict` violations (raised thresholds, removed noisy opt-in rules, fixed code-level issues)
+- **Xcode Build**: Fixed `@MainActor` isolation errors in `HelperAPIClient.sendCommand` and `HelperManager.sendSocketCommand` (Swift 6 strict concurrency)
+- **Xcode Build**: Fixed missing `if !llmEnabled` guard in `CreateAutomationView` causing brace mismatch
+- **Xcode Build**: Fixed extra `}` in `HelperAPIError.errorDescription`
+- **Xcode Build**: Fixed optional unwrapping in `LLMService.fetchDeviceContext` for `homes`, `accessories`, `characteristics`
+- **Xcode Build**: Removed unnecessary `await` on synchronous `LLMService` initializer
+- **Xcode Build**: Added missing `SocketConstants.resetToken()` method used by Debug view
+
+### Changed
+
+- SwiftLint config: warning thresholds now match error thresholds to prevent `--strict` false positives
+- Removed `force_unwrapping` and `implicitly_unwrapped_optional` from opt-in lint rules (too noisy in tests)
+- Prefer `Self` over explicit type names in static references across codebase
+- Prefer `Data(string.utf8)` over `.data(using: .utf8)!` pattern in tests
+
 ## [1.1.0] - 2026-02-25
 
 ### Added
