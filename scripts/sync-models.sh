@@ -54,7 +54,7 @@ if [[ "${1:-}" == "--update" ]]; then
         # Process Models.swift: strip header, imports, formatter, doc comments, public
         sed -E \
             -e '1,/^import Foundation/d'           \
-            -e '/sharedISO8601Formatter/d'         \
+            -e '/^.*let sharedISO8601Formatter/d'         \
             -e 's/^[[:space:]]*\/\/\/.*$//'        \
             -e '/^$/N;/^\n$/d'                     \
             -e 's/public //g'                      \

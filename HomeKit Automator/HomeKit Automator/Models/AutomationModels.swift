@@ -1,25 +1,24 @@
-// AutomationModels.swift
 // HomeKitAutomator — This file should match HomeKitCore/Models.swift and
 // HomeKitCore/AnyCodableValue.swift — do not edit independently.
 //
 // This is a copy of the canonical models from Sources/HomeKitCore/.
 // HomeKitAutomator is built via Xcode/XcodeGen and cannot import the SPM HomeKitCore
 // module directly. Keep this file in sync with the canonical versions.
-//
-// ⚠️ IMPORTANT: This file was renamed from Models.swift to AutomationModels.swift
-// to avoid conflicts with the Swift Package Manager's HomeKitCore/Models.swift
 
 import Foundation
-
-// MARK: - Shared Formatters
 
 /// A shared ISO 8601 date formatter for efficient reuse. Thread-safe once created.
 nonisolated(unsafe) let sharedISO8601Formatter = ISO8601DateFormatter()
 
+
+// MARK: - Shared Formatters
+
+/// A shared ISO 8601 date formatter for efficient reuse. Thread-safe once created.
+
 // MARK: - Automation Definition (Input from LLM)
 
 /// The raw automation definition as constructed by the LLM from the user's natural language request.
-/// This is the input format for `automation create`. The engine validates it against the live device
+
 /// map and transforms it into a `RegisteredAutomation` upon successful creation.
 struct AutomationDefinition: Codable, Sendable {
     let name: String
@@ -29,9 +28,11 @@ struct AutomationDefinition: Codable, Sendable {
     let actions: [AutomationAction]
     let enabled: Bool?
 
-    init(name: String, description: String? = nil, trigger: AutomationTrigger,
-         conditions: [AutomationCondition]? = nil, actions: [AutomationAction],
-         enabled: Bool? = nil) {
+    init(
+        name: String, description: String? = nil, trigger: AutomationTrigger,
+        conditions: [AutomationCondition]? = nil, actions: [AutomationAction],
+        enabled: Bool? = nil
+    ) {
         self.name = name
         self.description = description
         self.trigger = trigger
@@ -56,10 +57,12 @@ struct RegisteredAutomation: Codable, Identifiable, Sendable, Hashable {
     let createdAt: String
     var lastRun: String?
 
-    init(id: String, name: String, description: String? = nil,
-         trigger: AutomationTrigger, conditions: [AutomationCondition]? = nil,
-         actions: [AutomationAction], enabled: Bool, shortcutName: String,
-         createdAt: String, lastRun: String? = nil) {
+    init(
+        id: String, name: String, description: String? = nil,
+        trigger: AutomationTrigger, conditions: [AutomationCondition]? = nil,
+        actions: [AutomationAction], enabled: Bool, shortcutName: String,
+        createdAt: String, lastRun: String? = nil
+    ) {
         self.id = id
         self.name = name
         self.description = description
@@ -71,13 +74,13 @@ struct RegisteredAutomation: Codable, Identifiable, Sendable, Hashable {
         self.createdAt = createdAt
         self.lastRun = lastRun
     }
-    
+
     // MARK: - Hashable
-    
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
-    
+
     static func == (lhs: RegisteredAutomation, rhs: RegisteredAutomation) -> Bool {
         lhs.id == rhs.id
     }
@@ -100,13 +103,15 @@ struct AutomationTrigger: Codable, Sendable, Hashable {
     let `operator`: String?
     let value: AnyCodableValue?
 
-    init(type: String, humanReadable: String,
-         cron: String? = nil, timezone: String? = nil,
-         event: String? = nil, offsetMinutes: Int? = nil,
-         keyword: String? = nil,
-         deviceUuid: String? = nil, deviceName: String? = nil,
-         characteristic: String? = nil, operator: String? = nil,
-         value: AnyCodableValue? = nil) {
+    init(
+        type: String, humanReadable: String,
+        cron: String? = nil, timezone: String? = nil,
+        event: String? = nil, offsetMinutes: Int? = nil,
+        keyword: String? = nil,
+        deviceUuid: String? = nil, deviceName: String? = nil,
+        characteristic: String? = nil, operator: String? = nil,
+        value: AnyCodableValue? = nil
+    ) {
         self.type = type
         self.humanReadable = humanReadable
         self.cron = cron
@@ -138,13 +143,15 @@ struct AutomationCondition: Codable, Sendable, Hashable {
     let value: AnyCodableValue?
     let requirement: String?
 
-    init(type: String, humanReadable: String,
-         after: String? = nil, before: String? = nil,
-         days: [Int]? = nil,
-         deviceUuid: String? = nil, deviceName: String? = nil,
-         characteristic: String? = nil, operator: String? = nil,
-         value: AnyCodableValue? = nil,
-         requirement: String? = nil) {
+    init(
+        type: String, humanReadable: String,
+        after: String? = nil, before: String? = nil,
+        days: [Int]? = nil,
+        deviceUuid: String? = nil, deviceName: String? = nil,
+        characteristic: String? = nil, operator: String? = nil,
+        value: AnyCodableValue? = nil,
+        requirement: String? = nil
+    ) {
         self.type = type
         self.humanReadable = humanReadable
         self.after = after
@@ -173,15 +180,17 @@ struct AutomationAction: Codable, Sendable, Hashable {
     let sceneName: String?
     let sceneUuid: String?
 
-    init(type: String? = nil,
-         deviceUuid: String = "",
-         deviceName: String = "",
-         room: String? = nil,
-         characteristic: String = "",
-         value: AnyCodableValue = .null,
-         delaySeconds: Int = 0,
-         sceneName: String? = nil,
-         sceneUuid: String? = nil) {
+    init(
+        type: String? = nil,
+        deviceUuid: String = "",
+        deviceName: String = "",
+        room: String? = nil,
+        characteristic: String = "",
+        value: AnyCodableValue = .null,
+        delaySeconds: Int = 0,
+        sceneName: String? = nil,
+        sceneUuid: String? = nil
+    ) {
         self.type = type
         self.deviceUuid = deviceUuid
         self.deviceName = deviceName
@@ -204,7 +213,8 @@ struct AutomationSuggestion: Codable, Sendable {
     let actions: [String]
     let category: String
 
-    init(name: String, reason: String, trigger: String, actions: [String], category: String) {
+    init(name: String, reason: String, trigger: String, actions: [String], category: String)
+    {
         self.name = name
         self.reason = reason
         self.trigger = trigger
@@ -244,8 +254,10 @@ struct AutomationLogEntry: Codable, Identifiable, Sendable {
         return Double(succeeded) / Double(actionsExecuted) * 100.0
     }
 
-    init(automationId: String, automationName: String, timestamp: String,
-         actionsExecuted: Int, succeeded: Int, failed: Int, errors: [String]? = nil) {
+    init(
+        automationId: String, automationName: String, timestamp: String,
+        actionsExecuted: Int, succeeded: Int, failed: Int, errors: [String]? = nil
+    ) {
         self.automationId = automationId
         self.automationName = automationName
         self.timestamp = timestamp
@@ -260,13 +272,49 @@ struct AutomationLogEntry: Codable, Identifiable, Sendable {
 
 /// A type-erased Codable value supporting JSON primitives.
 /// This should match the canonical version in HomeKitCore/AnyCodableValue.swift.
-enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible, Hashable {
+
+/// A type-erased Codable value that can represent any JSON-compatible type.
+
+/// HomeKit values are inherently heterogeneous: an accessory's state can be represented by different data types
+
+/// - **Power state**: Boolean (on/off)
+
+/// - **Color temperature**: Float/Double (in Kelvin)
+
+/// - **Sensor arrays**: Arrays of values
+
+/// This enum provides a unified, type-erased representation that can hold any of these types and be transparently
+
+/// allow safe extraction of expected types.
+
+/// Used throughout the socket protocol and command response handling where the exact structure of values cannot be
+
+enum AnyCodableValue: Codable, Equatable, Hashable, Sendable, CustomStringConvertible {
+
+    /// and other textual HomeKit characteristic values.
     case string(String)
+
+    /// Integer value. Commonly used for discrete numeric characteristics like brightness (0-100),
+
     case int(Int)
+
+    /// Double-precision floating-point value. Used for continuous numeric characteristics like
+
     case double(Double)
+
+    /// Boolean value. Used for binary switch states, occupancy detection, lock status (locked/unlocked),
+
     case bool(Bool)
+
+    /// Array of heterogeneous values. Used for multi-valued responses such as lists of scenes,
+
     case array([AnyCodableValue])
+
+    /// Nested dictionary with string keys and heterogeneous values. Used for complex structured data
+
     case dictionary([String: AnyCodableValue])
+
+    /// Null/nil value. Represents the absence of data or explicitly null JSON values.
     case null
 
     // MARK: - CustomStringConvertible
@@ -285,7 +333,7 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible, Has
 
     // MARK: - Display String
 
-    /// Returns a human-readable string representation of the value.
+    /// Returns a human-readable string representation of the value, with formatted doubles.
     var displayString: String {
         switch self {
         case .string(let val): return val
@@ -313,6 +361,9 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible, Has
     }
 
     /// Extracts the double value, or returns nil if this value is not numeric.
+
+    /// This is useful for commands that require fractional values (temperatures, percentages) but receive
+
     var doubleValue: Double? {
         switch self {
         case .double(let d): return d
@@ -342,7 +393,7 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible, Has
     // MARK: - Raw Value
 
     /// Extracts the underlying Swift value (not AnyCodableValue).
-    /// Useful for passing to HomeKit characteristic writers that expect Any type.
+
     var rawValue: Any {
         switch self {
         case .string(let s): return s
@@ -357,8 +408,23 @@ enum AnyCodableValue: Codable, Equatable, Sendable, CustomStringConvertible, Has
 
     // MARK: - Codable
 
+    /// Decodes a JSON value into the appropriate AnyCodableValue case using a priority-based strategy.
+
+    /// The decoder attempts to decode in this priority order:
+
+    /// 2. **bool**: Returns `.bool` if the value decodes as a JSON boolean (true/false).
+
+    /// 4. **double**: Returns `.double` if the value decodes as a JSON floating-point number.
+
+    /// 6. **array**: Returns `.array` if the value is a JSON array (recursively decoding elements).
+
+    ///
+
+    /// This priority order ensures that numbers are captured at the most specific type first (bool > int > double)
+
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
+
         if container.decodeNil() {
             self = .null
         } else if let b = try? container.decode(Bool.self) {
