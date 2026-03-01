@@ -1,9 +1,9 @@
 class HomekitAutomator < Formula
   desc "AI-powered HomeKit automation skill for OpenClaw"
   homepage "https://github.com/and3rn3t/homekit-automator"
-  url "https://github.com/and3rn3t/homekit-automator/archive/refs/tags/v1.1.0.tar.gz"
-  # TODO: Update sha256 after cutting the v1.1.0 release tag
-  sha256 "PLACEHOLDER"
+  url "https://github.com/and3rn3t/homekit-automator/archive/refs/tags/v1.1.1.tar.gz"
+  
+  sha256 "b2018224a9f9a47bce1dd360c19d9528d7e01b903a307e8b60f2fe3314ac752c"
   license "MIT"
 
   depends_on :macos => :sonoma
