@@ -3,9 +3,10 @@
 // Response.isOk computed property, and SocketError descriptions.
 // swiftlint:disable force_cast
 
-import XCTest
-@testable import homekitauto
 import HomeKitCore
+import XCTest
+
+@testable import homekitauto
 
 final class SocketClientTests: XCTestCase {
 
@@ -56,7 +57,7 @@ final class SocketClientTests: XCTestCase {
             params: [
                 "name": .string("Living Room Light"),
                 "brightness": .int(80),
-                "on": .bool(true)
+                "on": .bool(true),
             ],
             token: "tok-999",
             version: 2
@@ -77,9 +78,10 @@ final class SocketClientTests: XCTestCase {
     // MARK: - Response Decoding
 
     func testResponseIsOkTrue() throws {
-        let json = """
-        {"id":"r1","status":"ok","data":null,"error":null}
-        """.data(using: .utf8)!
+        let json = Data(
+            """
+            {"id":"r1","status":"ok","data":null,"error":null}
+            """.utf8)
         let response = try JSONDecoder().decode(SocketClient.Response.self, from: json)
 
         XCTAssertTrue(response.isOk)
@@ -88,9 +90,10 @@ final class SocketClientTests: XCTestCase {
     }
 
     func testResponseIsOkFalse() throws {
-        let json = """
-        {"id":"r2","status":"error","data":null,"error":"Something went wrong"}
-        """.data(using: .utf8)!
+        let json = Data(
+            """
+            {"id":"r2","status":"error","data":null,"error":"Something went wrong"}
+            """.utf8)
         let response = try JSONDecoder().decode(SocketClient.Response.self, from: json)
 
         XCTAssertFalse(response.isOk)
@@ -98,18 +101,20 @@ final class SocketClientTests: XCTestCase {
     }
 
     func testResponseIsOkFalseForArbitraryStatus() throws {
-        let json = """
-        {"id":"r3","status":"unknown","data":null,"error":null}
-        """.data(using: .utf8)!
+        let json = Data(
+            """
+            {"id":"r3","status":"unknown","data":null,"error":null}
+            """.utf8)
         let response = try JSONDecoder().decode(SocketClient.Response.self, from: json)
 
         XCTAssertFalse(response.isOk)
     }
 
     func testResponseWithDictionaryData() throws {
-        let json = """
-        {"id":"r4","status":"ok","data":{"name":"Living Room","temperature":22.5}}
-        """.data(using: .utf8)!
+        let json = Data(
+            """
+            {"id":"r4","status":"ok","data":{"name":"Living Room","temperature":22.5}}
+            """.utf8)
         let response = try JSONDecoder().decode(SocketClient.Response.self, from: json)
 
         XCTAssertTrue(response.isOk)
@@ -122,9 +127,10 @@ final class SocketClientTests: XCTestCase {
     }
 
     func testResponseWithArrayData() throws {
-        let json = """
-        {"id":"r5","status":"ok","data":["Scene A","Scene B"]}
-        """.data(using: .utf8)!
+        let json = Data(
+            """
+            {"id":"r5","status":"ok","data":["Scene A","Scene B"]}
+            """.utf8)
         let response = try JSONDecoder().decode(SocketClient.Response.self, from: json)
 
         XCTAssertTrue(response.isOk)
@@ -137,9 +143,10 @@ final class SocketClientTests: XCTestCase {
     }
 
     func testResponseWithStringData() throws {
-        let json = """
-        {"id":"r6","status":"ok","data":"connected"}
-        """.data(using: .utf8)!
+        let json = Data(
+            """
+            {"id":"r6","status":"ok","data":"connected"}
+            """.utf8)
         let response = try JSONDecoder().decode(SocketClient.Response.self, from: json)
 
         if case .string(let str) = response.data {
@@ -150,9 +157,10 @@ final class SocketClientTests: XCTestCase {
     }
 
     func testResponseWithNullData() throws {
-        let json = """
-        {"id":"r7","status":"ok","data":null}
-        """.data(using: .utf8)!
+        let json = Data(
+            """
+            {"id":"r7","status":"ok","data":null}
+            """.utf8)
         let response = try JSONDecoder().decode(SocketClient.Response.self, from: json)
 
         XCTAssertTrue(response.isOk)
@@ -168,7 +176,7 @@ final class SocketClientTests: XCTestCase {
             status: "ok",
             data: .dictionary([
                 "homes": .int(2),
-                "connected": .bool(true)
+                "connected": .bool(true),
             ]),
             error: nil
         )
@@ -245,6 +253,7 @@ final class SocketClientTests: XCTestCase {
         let withoutTrailing = String(string.dropLast())
         XCTAssertFalse(withoutTrailing.contains("\n"))
         // Must be valid JSON when stripped
-        XCTAssertNoThrow(try JSONSerialization.jsonObject(with: withoutTrailing.data(using: .utf8)!))
+        XCTAssertNoThrow(
+            try JSONSerialization.jsonObject(with: withoutTrailing.data(using: .utf8)!))
     }
 }

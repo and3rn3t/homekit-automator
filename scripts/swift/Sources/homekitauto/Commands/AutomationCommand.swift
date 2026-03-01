@@ -359,7 +359,7 @@ struct AutomationEdit: AsyncParsableCommand {
                 actions: automation.actions,
                 outputPath: shortcutPath
             )
-            let _ = try await shortcutGenerator.importShortcut(
+            _ = try await shortcutGenerator.importShortcut(
                 name: automation.shortcutName,
                 path: shortcutPath
             )

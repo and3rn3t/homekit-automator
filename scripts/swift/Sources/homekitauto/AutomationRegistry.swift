@@ -177,7 +177,7 @@ actor AutomationRegistry {
     // MARK: - Persistence
 
     private func persist(_ automations: [RegisteredAutomation]) throws {
-        let _ = try ensureConfigDir()
+        _ = try ensureConfigDir()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(automations)

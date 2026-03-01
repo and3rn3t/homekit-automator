@@ -165,7 +165,7 @@ struct Energy: AsyncParsableCommand {
         let insights = analyzer.generateEnergyInsights(log: log, period: period)
 
         // If --history is set, generate extended historical analysis
-        var historyData: [String: AnyCodableValue]? = nil
+        var historyData: [String: AnyCodableValue]?
         if history {
             historyData = generateEnergyHistory(
                 log: log, automations: automations, deviceMap: discoverResponse.data)
@@ -323,7 +323,7 @@ struct Energy: AsyncParsableCommand {
         }
 
         let sortedHours = hourCounts.sorted { $0.value > $1.value }
-        let topHours = sortedHours.prefix(3).map { (hour, count) -> String in
+        let topHours = sortedHours.prefix(3).map { hour, count -> String in
             let amPm =
                 hour >= 12 ? "\(hour == 12 ? 12 : hour - 12) PM" : "\(hour == 0 ? 12 : hour) AM"
             return "\(amPm) (\(count) runs)"

@@ -3,6 +3,7 @@
 // swiftlint:disable type_body_length
 
 import XCTest
+
 @testable import homekitauto
 
 final class HomeAnalyzerTests: XCTestCase {
@@ -12,25 +13,31 @@ final class HomeAnalyzerTests: XCTestCase {
     /// Builds a mock device map matching the HomeKit discovery format:
     /// `{ "homes": [{ "rooms": [{ "name": ..., "accessories": [...] }] }] }`
     private func makeDeviceMap(
-        rooms: [(name: String, accessories: [(name: String, category: String, characteristics: [(type: String, value: AnyCodableValue)])])]
+        rooms: [(
+            name: String,
+            accessories: [(
+                name: String, category: String,
+                characteristics: [(type: String, value: AnyCodableValue)]
+            )]
+        )]
     ) -> AnyCodableValue {
         let roomValues: [AnyCodableValue] = rooms.map { room in
             let accessoryValues: [AnyCodableValue] = room.accessories.map { acc in
                 let charValues: [AnyCodableValue] = acc.characteristics.map { char in
                     .dictionary([
                         "type": .string(char.type),
-                        "value": char.value
+                        "value": char.value,
                     ])
                 }
                 return .dictionary([
                     "name": .string(acc.name),
                     "category": .string(acc.category),
-                    "characteristics": .array(charValues)
+                    "characteristics": .array(charValues),
                 ])
             }
             return .dictionary([
                 "name": .string(room.name),
-                "accessories": .array(accessoryValues)
+                "accessories": .array(accessoryValues),
             ])
         }
 
@@ -47,16 +54,23 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testSecuritySuggestions() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Entry", accessories: [
-                (name: "Front Door Lock", category: "lock", characteristics: []),
-                (name: "Back Door Lock", category: "lock", characteristics: [])
-            ]),
-            (name: "Garage", accessories: [
-                (name: "Garage Door", category: "garageDoorOpener", characteristics: [])
-            ])
+            (
+                name: "Entry",
+                accessories: [
+                    (name: "Front Door Lock", category: "lock", characteristics: []),
+                    (name: "Back Door Lock", category: "lock", characteristics: []),
+                ]
+            ),
+            (
+                name: "Garage",
+                accessories: [
+                    (name: "Garage Door", category: "garageDoorOpener", characteristics: [])
+                ]
+            ),
         ])
 
-        let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: "security")
+        let analyzer = HomeAnalyzer(
+            deviceMap: deviceMap, existingAutomations: [], focus: "security")
         let suggestions = analyzer.generateSuggestions()
 
         XCTAssertFalse(suggestions.isEmpty)
@@ -75,12 +89,18 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testComfortSuggestions() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Living Room", accessories: [
-                (name: "Main Thermostat", category: "thermostat", characteristics: [])
-            ]),
-            (name: "Bedroom", accessories: [
-                (name: "Bedroom Thermostat", category: "thermostat", characteristics: [])
-            ])
+            (
+                name: "Living Room",
+                accessories: [
+                    (name: "Main Thermostat", category: "thermostat", characteristics: [])
+                ]
+            ),
+            (
+                name: "Bedroom",
+                accessories: [
+                    (name: "Bedroom Thermostat", category: "thermostat", characteristics: [])
+                ]
+            ),
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: "comfort")
@@ -99,19 +119,29 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testConvenienceSuggestions() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Hallway", accessories: [
-                (name: "Hallway Sensor", category: "motionSensor", characteristics: []),
-                (name: "Hallway Light", category: "light", characteristics: [])
-            ]),
-            (name: "Kitchen", accessories: [
-                (name: "Kitchen Light", category: "light", characteristics: [])
-            ]),
-            (name: "Bedroom", accessories: [
-                (name: "Bedroom Light", category: "light", characteristics: [])
-            ])
+            (
+                name: "Hallway",
+                accessories: [
+                    (name: "Hallway Sensor", category: "motionSensor", characteristics: []),
+                    (name: "Hallway Light", category: "light", characteristics: []),
+                ]
+            ),
+            (
+                name: "Kitchen",
+                accessories: [
+                    (name: "Kitchen Light", category: "light", characteristics: [])
+                ]
+            ),
+            (
+                name: "Bedroom",
+                accessories: [
+                    (name: "Bedroom Light", category: "light", characteristics: [])
+                ]
+            ),
         ])
 
-        let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: "convenience")
+        let analyzer = HomeAnalyzer(
+            deviceMap: deviceMap, existingAutomations: [], focus: "convenience")
         let suggestions = analyzer.generateSuggestions()
 
         XCTAssertFalse(suggestions.isEmpty)
@@ -131,13 +161,19 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testEnergySuggestions() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Living Room", accessories: [
-                (name: "Thermostat", category: "thermostat", characteristics: []),
-                (name: "Living Light", category: "light", characteristics: [])
-            ]),
-            (name: "Entry", accessories: [
-                (name: "Front Lock", category: "lock", characteristics: [])
-            ])
+            (
+                name: "Living Room",
+                accessories: [
+                    (name: "Thermostat", category: "thermostat", characteristics: []),
+                    (name: "Living Light", category: "light", characteristics: []),
+                ]
+            ),
+            (
+                name: "Entry",
+                accessories: [
+                    (name: "Front Lock", category: "lock", characteristics: [])
+                ]
+            ),
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: "energy")
@@ -168,21 +204,39 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testEnergyInsights() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Kitchen", accessories: [
-                (name: "Kitchen Light", category: "light", characteristics: [
-                    (type: "power", value: .bool(true))
-                ])
-            ]),
-            (name: "Living Room", accessories: [
-                (name: "Main Thermostat", category: "thermostat", characteristics: [
-                    (type: "currentHeatingCoolingState", value: .int(1))
-                ])
-            ]),
-            (name: "Bedroom", accessories: [
-                (name: "Bedroom Light", category: "light", characteristics: [
-                    (type: "power", value: .bool(false))
-                ])
-            ])
+            (
+                name: "Kitchen",
+                accessories: [
+                    (
+                        name: "Kitchen Light", category: "light",
+                        characteristics: [
+                            (type: "power", value: .bool(true))
+                        ]
+                    )
+                ]
+            ),
+            (
+                name: "Living Room",
+                accessories: [
+                    (
+                        name: "Main Thermostat", category: "thermostat",
+                        characteristics: [
+                            (type: "currentHeatingCoolingState", value: .int(1))
+                        ]
+                    )
+                ]
+            ),
+            (
+                name: "Bedroom",
+                accessories: [
+                    (
+                        name: "Bedroom Light", category: "light",
+                        characteristics: [
+                            (type: "power", value: .bool(false))
+                        ]
+                    )
+                ]
+            ),
         ])
 
         let formatter = ISO8601DateFormatter()
@@ -248,8 +302,13 @@ final class HomeAnalyzerTests: XCTestCase {
 
     // MARK: - Energy Insights Edge Cases
 
-    // swiftlint:disable:next line_length
-    typealias RoomFixture = (name: String, accessories: [(name: String, category: String, characteristics: [(type: String, value: AnyCodableValue)])])
+    typealias RoomFixture = (
+        name: String,
+        accessories: [(
+            name: String, category: String,
+            characteristics: [(type: String, value: AnyCodableValue)]
+        )]
+    )
 
     func testEnergyInsightsManyActiveDevices() {
         // >5 active devices should trigger the "consider if they all need to be on" warning
@@ -257,9 +316,12 @@ final class HomeAnalyzerTests: XCTestCase {
             (
                 name: "Room \(i)",
                 accessories: [
-                    (name: "Light \(i)", category: "light", characteristics: [
-                        (type: "power", value: .bool(true))
-                    ])
+                    (
+                        name: "Light \(i)", category: "light",
+                        characteristics: [
+                            (type: "power", value: .bool(true))
+                        ]
+                    )
                 ]
             )
         }
@@ -272,18 +334,25 @@ final class HomeAnalyzerTests: XCTestCase {
         XCTAssertEqual(devicesOn?.count, 7)
 
         let insightStrings = insights["insights"]?.arrayValue?.compactMap { $0.stringValue } ?? []
-        XCTAssertTrue(insightStrings.contains { $0.contains("7 devices currently active") },
-                      "Should warn about many active devices: \(insightStrings)")
+        XCTAssertTrue(
+            insightStrings.contains { $0.contains("7 devices currently active") },
+            "Should warn about many active devices: \(insightStrings)")
     }
 
     func testEnergyInsightsAllOff() {
         // All devices off → "great for energy savings"
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Room 1", accessories: [
-                (name: "Light 1", category: "light", characteristics: [
-                    (type: "power", value: .bool(false))
-                ])
-            ])
+            (
+                name: "Room 1",
+                accessories: [
+                    (
+                        name: "Light 1", category: "light",
+                        characteristics: [
+                            (type: "power", value: .bool(false))
+                        ]
+                    )
+                ]
+            )
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: nil)
@@ -293,8 +362,9 @@ final class HomeAnalyzerTests: XCTestCase {
         XCTAssertEqual(devicesOn?.count, 0)
 
         let insightStrings = insights["insights"]?.arrayValue?.compactMap { $0.stringValue } ?? []
-        XCTAssertTrue(insightStrings.contains { $0.contains("energy savings") },
-                      "Should congratulate when all devices are off: \(insightStrings)")
+        XCTAssertTrue(
+            insightStrings.contains { $0.contains("energy savings") },
+            "Should congratulate when all devices are off: \(insightStrings)")
     }
 
     func testEnergyInsightsEmptyLog() {
@@ -309,19 +379,27 @@ final class HomeAnalyzerTests: XCTestCase {
     func testEnergyInsightsThermostatCooling() {
         // Test cooling mode detection (value = 2)
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Living Room", accessories: [
-                (name: "AC Unit", category: "thermostat", characteristics: [
-                    (type: "currentHeatingCoolingState", value: .int(2))
-                ])
-            ])
+            (
+                name: "Living Room",
+                accessories: [
+                    (
+                        name: "AC Unit", category: "thermostat",
+                        characteristics: [
+                            (type: "currentHeatingCoolingState", value: .int(2))
+                        ]
+                    )
+                ]
+            )
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: nil)
         let insights = analyzer.generateEnergyInsights(log: [], period: "today")
 
-        let deviceNames = insights["devicesCurrentlyOn"]?.arrayValue?.compactMap { $0.stringValue } ?? []
-        XCTAssertTrue(deviceNames.contains { $0.contains("cooling") },
-                      "Should detect cooling mode: \(deviceNames)")
+        let deviceNames =
+            insights["devicesCurrentlyOn"]?.arrayValue?.compactMap { $0.stringValue } ?? []
+        XCTAssertTrue(
+            deviceNames.contains { $0.contains("cooling") },
+            "Should detect cooling mode: \(deviceNames)")
     }
 
     // MARK: - Suggestion Deduplication
@@ -329,18 +407,26 @@ final class HomeAnalyzerTests: XCTestCase {
     func testSuggestionsExcludeExisting() {
         // If an automation named "Auto-lock at Night" already exists, it should not be re-suggested
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Entry", accessories: [
-                (name: "Front Door Lock", category: "lock", characteristics: [])
-            ])
+            (
+                name: "Entry",
+                accessories: [
+                    (name: "Front Door Lock", category: "lock", characteristics: [])
+                ]
+            )
         ])
 
         let existingAutomation = RegisteredAutomation(
             id: "existing-1",
             name: "Auto-lock at Night",
             description: "Already configured",
-            trigger: AutomationTrigger(type: "schedule", humanReadable: "nightly", cron: "0 22 * * *"),
+            trigger: AutomationTrigger(
+                type: "schedule", humanReadable: "nightly", cron: "0 22 * * *"),
             conditions: nil,
-            actions: [AutomationAction(deviceUuid: "dev-1", deviceName: "Lock", characteristic: "lockState", value: .int(1), delaySeconds: 0)],
+            actions: [
+                AutomationAction(
+                    deviceUuid: "dev-1", deviceName: "Lock", characteristic: "lockState",
+                    value: .int(1), delaySeconds: 0)
+            ],
             enabled: true,
             shortcutName: "HKA: Auto-lock at Night",
             createdAt: ISO8601DateFormatter().string(from: Date())
@@ -354,40 +440,55 @@ final class HomeAnalyzerTests: XCTestCase {
         let suggestions = analyzer.generateSuggestions()
 
         // "Auto-lock at Night" should be filtered out since it already exists
-        XCTAssertFalse(suggestions.contains { $0.name == "Auto-lock at Night" },
-                       "Should not suggest automations that already exist")
+        XCTAssertFalse(
+            suggestions.contains { $0.name == "Auto-lock at Night" },
+            "Should not suggest automations that already exist")
     }
 
     // MARK: - Focus Filter
 
     func testFocusFilterReturnsOnlyCategory() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Entry", accessories: [
-                (name: "Lock", category: "lock", characteristics: [])
-            ]),
-            (name: "Living", accessories: [
-                (name: "Thermostat", category: "thermostat", characteristics: []),
-                (name: "Light", category: "light", characteristics: [])
-            ])
+            (
+                name: "Entry",
+                accessories: [
+                    (name: "Lock", category: "lock", characteristics: [])
+                ]
+            ),
+            (
+                name: "Living",
+                accessories: [
+                    (name: "Thermostat", category: "thermostat", characteristics: []),
+                    (name: "Light", category: "light", characteristics: []),
+                ]
+            ),
         ])
 
         // With security focus, should not get comfort/convenience/energy suggestions
-        let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: "security")
+        let analyzer = HomeAnalyzer(
+            deviceMap: deviceMap, existingAutomations: [], focus: "security")
         let suggestions = analyzer.generateSuggestions()
-        XCTAssertTrue(suggestions.allSatisfy { $0.category == "security" },
-                      "Security focus should only return security suggestions")
+        XCTAssertTrue(
+            suggestions.allSatisfy { $0.category == "security" },
+            "Security focus should only return security suggestions")
     }
 
     func testNilFocusReturnsAllCategories() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Entry", accessories: [
-                (name: "Lock", category: "lock", characteristics: [])
-            ]),
-            (name: "Living", accessories: [
-                (name: "Thermostat", category: "thermostat", characteristics: []),
-                (name: "Light", category: "light", characteristics: []),
-                (name: "Sensor", category: "motionSensor", characteristics: [])
-            ])
+            (
+                name: "Entry",
+                accessories: [
+                    (name: "Lock", category: "lock", characteristics: [])
+                ]
+            ),
+            (
+                name: "Living",
+                accessories: [
+                    (name: "Thermostat", category: "thermostat", characteristics: []),
+                    (name: "Light", category: "light", characteristics: []),
+                    (name: "Sensor", category: "motionSensor", characteristics: []),
+                ]
+            ),
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: nil)
@@ -395,17 +496,21 @@ final class HomeAnalyzerTests: XCTestCase {
 
         // Without focus, should get suggestions from multiple categories
         let categories = Swift.Set(suggestions.map { $0.category })
-        XCTAssertTrue(categories.count >= 2,
-                      "Nil focus should return suggestions from multiple categories, got: \(categories)")
+        XCTAssertTrue(
+            categories.count >= 2,
+            "Nil focus should return suggestions from multiple categories, got: \(categories)")
     }
 
     // MARK: - Seasonal Suggestion Tests
 
     func testSeasonalSuggestionsWithThermostats() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Living Room", accessories: [
-                (name: "Main Thermostat", category: "thermostat", characteristics: [])
-            ])
+            (
+                name: "Living Room",
+                accessories: [
+                    (name: "Main Thermostat", category: "thermostat", characteristics: [])
+                ]
+            )
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: nil)
@@ -432,9 +537,12 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testSeasonalSuggestionsWithLights() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Living Room", accessories: [
-                (name: "Living Light", category: "light", characteristics: [])
-            ])
+            (
+                name: "Living Room",
+                accessories: [
+                    (name: "Living Light", category: "light", characteristics: [])
+                ]
+            )
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: nil)
@@ -454,9 +562,12 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testSeasonalSuggestionsWithWindowCoverings() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Bedroom", accessories: [
-                (name: "Bedroom Blinds", category: "windowCovering", characteristics: [])
-            ])
+            (
+                name: "Bedroom",
+                accessories: [
+                    (name: "Bedroom Blinds", category: "windowCovering", characteristics: [])
+                ]
+            )
         ])
 
         let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: [], focus: nil)
@@ -476,11 +587,14 @@ final class HomeAnalyzerTests: XCTestCase {
 
     func testSeasonalSuggestionsDeduplication() {
         let deviceMap = makeDeviceMap(rooms: [
-            (name: "Living Room", accessories: [
-                (name: "Thermostat", category: "thermostat", characteristics: []),
-                (name: "Light", category: "light", characteristics: []),
-                (name: "Blinds", category: "windowCovering", characteristics: [])
-            ])
+            (
+                name: "Living Room",
+                accessories: [
+                    (name: "Thermostat", category: "thermostat", characteristics: []),
+                    (name: "Light", category: "light", characteristics: []),
+                    (name: "Blinds", category: "windowCovering", characteristics: []),
+                ]
+            )
         ])
 
         // Create existing automations that match all seasonal suggestion names
@@ -488,7 +602,7 @@ final class HomeAnalyzerTests: XCTestCase {
             "Winter Heating Schedule", "Holiday Lighting",
             "Spring Ventilation Reminder", "Allergy-Aware Windows",
             "Summer Cooling Schedule", "Summer Shade Control",
-            "Fall Transition Schedule", "Early Darkness Lights"
+            "Fall Transition Schedule", "Early Darkness Lights",
         ]
         let existingAutomations = seasonalNames.map { name in
             RegisteredAutomation(
@@ -496,17 +610,24 @@ final class HomeAnalyzerTests: XCTestCase {
                 name: name,
                 trigger: AutomationTrigger(type: "manual", humanReadable: "manual"),
                 conditions: nil,
-                actions: [AutomationAction(deviceUuid: "dev-1", deviceName: "Dev", characteristic: "power", value: .bool(true), delaySeconds: 0)],
+                actions: [
+                    AutomationAction(
+                        deviceUuid: "dev-1", deviceName: "Dev", characteristic: "power",
+                        value: .bool(true), delaySeconds: 0)
+                ],
                 enabled: true,
                 shortcutName: "HKA: \(name)",
                 createdAt: ISO8601DateFormatter().string(from: Date())
             )
         }
 
-        let analyzer = HomeAnalyzer(deviceMap: deviceMap, existingAutomations: existingAutomations, focus: nil)
+        let analyzer = HomeAnalyzer(
+            deviceMap: deviceMap, existingAutomations: existingAutomations, focus: nil)
         let suggestions = analyzer.generateSeasonalSuggestions()
 
-        XCTAssertTrue(suggestions.isEmpty, "Should not suggest automations that already exist, got: \(suggestions.map(\.name))")
+        XCTAssertTrue(
+            suggestions.isEmpty,
+            "Should not suggest automations that already exist, got: \(suggestions.map(\.name))")
     }
 
     func testSeasonalSuggestionsNoDevices() {
@@ -534,15 +655,16 @@ final class HomeAnalyzerTests: XCTestCase {
         // Create 10+ runs for "Morning Routine" → should suggest schedule optimization
         var logEntries: [AutomationLogEntry] = []
         for i in 0..<12 {
-            logEntries.append(AutomationLogEntry(
-                automationId: "auto-1",
-                automationName: "Morning Routine",
-                timestamp: formatter.string(from: now.addingTimeInterval(Double(-i * 3600))),
-                actionsExecuted: 2,
-                succeeded: 2,
-                failed: 0,
-                errors: nil
-            ))
+            logEntries.append(
+                AutomationLogEntry(
+                    automationId: "auto-1",
+                    automationName: "Morning Routine",
+                    timestamp: formatter.string(from: now.addingTimeInterval(Double(-i * 3600))),
+                    actionsExecuted: 2,
+                    succeeded: 2,
+                    failed: 0,
+                    errors: nil
+                ))
         }
 
         let analyzer = HomeAnalyzer(deviceMap: nil, existingAutomations: [], focus: nil)
@@ -553,7 +675,9 @@ final class HomeAnalyzerTests: XCTestCase {
             "Should suggest optimizing frequently triggered automation, got: \(suggestions.map(\.name))"
         )
 
-        let optimizeSuggestion = suggestions.first { $0.name == "Optimize Morning Routine Schedule" }
+        let optimizeSuggestion = suggestions.first {
+            $0.name == "Optimize Morning Routine Schedule"
+        }
         XCTAssertEqual(optimizeSuggestion?.category, "energy")
     }
 
@@ -596,29 +720,33 @@ final class HomeAnalyzerTests: XCTestCase {
 
         for i in 0..<5 {
             // 8 AM entry
-            let date8am = calendar.date(byAdding: .day, value: -i, to:
-                calendar.date(bySettingHour: 8, minute: 0, second: 0, of: baseDate)!)!
-            logEntries.append(AutomationLogEntry(
+            let date8am = calendar.date(
+                byAdding: .day, value: -i,
+                to:
+                    calendar.date(bySettingHour: 8, minute: 0, second: 0, of: baseDate)!)!
+            logEntries.append(
+                AutomationLogEntry(
+                    automationId: "auto-3",
+                    automationName: "Consistent Task",
+                    timestamp: formatter.string(from: date8am),
+                    actionsExecuted: 1,
+                    succeeded: 1,
+                    failed: 0,
+                    errors: nil
+                ))
+        }
+        // Add 1 entry at a different hour
+        let date3pm = calendar.date(bySettingHour: 15, minute: 0, second: 0, of: baseDate)!
+        logEntries.append(
+            AutomationLogEntry(
                 automationId: "auto-3",
                 automationName: "Consistent Task",
-                timestamp: formatter.string(from: date8am),
+                timestamp: formatter.string(from: date3pm),
                 actionsExecuted: 1,
                 succeeded: 1,
                 failed: 0,
                 errors: nil
             ))
-        }
-        // Add 1 entry at a different hour
-        let date3pm = calendar.date(bySettingHour: 15, minute: 0, second: 0, of: baseDate)!
-        logEntries.append(AutomationLogEntry(
-            automationId: "auto-3",
-            automationName: "Consistent Task",
-            timestamp: formatter.string(from: date3pm),
-            actionsExecuted: 1,
-            succeeded: 1,
-            failed: 0,
-            errors: nil
-        ))
 
         let analyzer = HomeAnalyzer(deviceMap: nil, existingAutomations: [], focus: nil)
         let suggestions = analyzer.generatePatternSuggestions(from: logEntries)
@@ -643,15 +771,16 @@ final class HomeAnalyzerTests: XCTestCase {
         // Create frequent runs
         var logEntries: [AutomationLogEntry] = []
         for i in 0..<15 {
-            logEntries.append(AutomationLogEntry(
-                automationId: "auto-1",
-                automationName: "Morning Routine",
-                timestamp: formatter.string(from: now.addingTimeInterval(Double(-i * 3600))),
-                actionsExecuted: 2,
-                succeeded: 2,
-                failed: 0,
-                errors: nil
-            ))
+            logEntries.append(
+                AutomationLogEntry(
+                    automationId: "auto-1",
+                    automationName: "Morning Routine",
+                    timestamp: formatter.string(from: now.addingTimeInterval(Double(-i * 3600))),
+                    actionsExecuted: 2,
+                    succeeded: 2,
+                    failed: 0,
+                    errors: nil
+                ))
         }
 
         // Existing automation with the exact suggestion name
@@ -660,7 +789,11 @@ final class HomeAnalyzerTests: XCTestCase {
             name: "Optimize Morning Routine Schedule",
             trigger: AutomationTrigger(type: "manual", humanReadable: "manual"),
             conditions: nil,
-            actions: [AutomationAction(deviceUuid: "dev-1", deviceName: "Dev", characteristic: "power", value: .bool(true), delaySeconds: 0)],
+            actions: [
+                AutomationAction(
+                    deviceUuid: "dev-1", deviceName: "Dev", characteristic: "power",
+                    value: .bool(true), delaySeconds: 0)
+            ],
             enabled: true,
             shortcutName: "HKA: Optimize Morning Routine Schedule",
             createdAt: ISO8601DateFormatter().string(from: Date())

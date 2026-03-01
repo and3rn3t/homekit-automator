@@ -100,7 +100,7 @@ struct SolarCalculator {
     /// Default location (San Francisco, CA) used as a fallback when the user has not
     /// configured their latitude/longitude. Users can set their coordinates via:
     ///   homekitauto config --set latitude 40.7128 --set longitude -74.0060
-    static let `default` = SolarCalculator(latitude: 37.7749, longitude: -122.4194, timeZone: .current)
+    static let `default` = Self(latitude: 37.7749, longitude: -122.4194, timeZone: .current)
 }
 
 /// Evaluates automation conditions against live state and environment.

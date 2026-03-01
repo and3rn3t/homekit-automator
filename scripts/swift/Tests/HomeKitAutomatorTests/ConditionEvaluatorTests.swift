@@ -10,7 +10,6 @@ final class ConditionEvaluatorTests: XCTestCase {
 
     /// Fixed timezone for solar tests — matches the default San Francisco coordinates.
     /// Using a fixed timezone ensures tests are deterministic regardless of CI runner locale.
-    // swiftlint:disable:next force_unwrapping
     private let pacificTZ = TimeZone(identifier: "America/Los_Angeles")!
 
     // MARK: - Helpers

@@ -2,6 +2,7 @@
 // Comprehensive CRUD tests for AutomationRegistry with isolated temp directories.
 
 import XCTest
+
 @testable import homekitauto
 
 final class AutomationRegistryCRUDTests: XCTestCase {
@@ -254,8 +255,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
             }
 
             var count = 0
-            for await succeeded in group {
-                if succeeded { count += 1 }
+            for await succeeded in group where succeeded {
+                count += 1
             }
             return count
         }
@@ -303,7 +304,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         let recentEntry = AutomationLogEntry(
             automationId: "auto-recent",
             automationName: "Recent",
-            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -3, to: now)!),
+            timestamp: formatter.string(
+                from: Calendar.current.date(byAdding: .day, value: -3, to: now)!),
             actionsExecuted: 1,
             succeeded: 1,
             failed: 0,
@@ -314,7 +316,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         let oldEntry = AutomationLogEntry(
             automationId: "auto-old",
             automationName: "Old",
-            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -10, to: now)!),
+            timestamp: formatter.string(
+                from: Calendar.current.date(byAdding: .day, value: -10, to: now)!),
             actionsExecuted: 1,
             succeeded: 1,
             failed: 0,
@@ -337,7 +340,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         let withinMonth = AutomationLogEntry(
             automationId: "auto-month",
             automationName: "Within Month",
-            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -15, to: now)!),
+            timestamp: formatter.string(
+                from: Calendar.current.date(byAdding: .day, value: -15, to: now)!),
             actionsExecuted: 1,
             succeeded: 1,
             failed: 0,
@@ -348,7 +352,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         let outsideMonth = AutomationLogEntry(
             automationId: "auto-outside",
             automationName: "Outside Month",
-            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -40, to: now)!),
+            timestamp: formatter.string(
+                from: Calendar.current.date(byAdding: .day, value: -40, to: now)!),
             actionsExecuted: 1,
             succeeded: 1,
             failed: 0,
@@ -386,7 +391,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         let yesterdayEntry = AutomationLogEntry(
             automationId: "auto-yesterday",
             automationName: "Yesterday",
-            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -1, to: now)!),
+            timestamp: formatter.string(
+                from: Calendar.current.date(byAdding: .day, value: -1, to: now)!),
             actionsExecuted: 1,
             succeeded: 1,
             failed: 0,
@@ -409,7 +415,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         let recentEntry = AutomationLogEntry(
             automationId: "auto-r",
             automationName: "Recent",
-            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -3, to: now)!),
+            timestamp: formatter.string(
+                from: Calendar.current.date(byAdding: .day, value: -3, to: now)!),
             actionsExecuted: 1,
             succeeded: 1,
             failed: 0,
@@ -420,7 +427,8 @@ final class AutomationRegistryCRUDTests: XCTestCase {
         let oldEntry = AutomationLogEntry(
             automationId: "auto-o",
             automationName: "Old",
-            timestamp: formatter.string(from: Calendar.current.date(byAdding: .day, value: -10, to: now)!),
+            timestamp: formatter.string(
+                from: Calendar.current.date(byAdding: .day, value: -10, to: now)!),
             actionsExecuted: 1,
             succeeded: 1,
             failed: 0,

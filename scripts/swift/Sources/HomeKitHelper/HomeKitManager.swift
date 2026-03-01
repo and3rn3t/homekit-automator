@@ -400,10 +400,8 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
         // Fuzzy match by lowercased name
         let lower = nameOrUuid.lowercased()
         for home in homeManager.homes {
-            for accessory in home.accessories {
-                if accessory.name.lowercased().contains(lower) {
-                    return accessory
-                }
+            for accessory in home.accessories where accessory.name.lowercased().contains(lower) {
+                return accessory
             }
         }
         return nil
@@ -479,15 +477,12 @@ class HomeKitManager: NSObject, HMHomeManagerDelegate, HMHomeDelegate {
         return value
     }
 
-    // MARK: - HomeKit Type Mapping
+    // MARK: - Characteristic & Category Mappings
 
     /// Maps HomeKit characteristic UUIDs to human-readable names.
     /// This table is the source of truth for names used in CLI commands and JSON responses.
     /// Common characteristics: "power", "brightness", "hue", "saturation", "temperature" variants,
     /// "lockState", "position" variants, "motionDetected", "contactState", "batteryLevel", etc.
-    // MARK: - Characteristic & Category Mappings
-
-    /// Lookup table from HomeKit characteristic UUID to friendly name.
     private static let characteristicTypeNames: [String: String] = [
         HMCharacteristicTypePowerState: "power",
         HMCharacteristicTypeBrightness: "brightness",

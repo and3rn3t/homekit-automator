@@ -41,11 +41,11 @@ public enum AnyCodableValue: Codable, Equatable, Hashable, Sendable, CustomStrin
 
     /// Array of heterogeneous values. Used for multi-valued responses such as lists of scenes,
     /// accessory lists, or structured arrays of mixed-type data from HomeKit queries.
-    case array([AnyCodableValue])
+    case array([Self])
 
     /// Nested dictionary with string keys and heterogeneous values. Used for complex structured data
     /// such as accessory metadata, scene configuration objects, and other nested HomeKit information.
-    case dictionary([String: AnyCodableValue])
+    case dictionary([String: Self])
 
     /// Null/nil value. Represents the absence of data or explicitly null JSON values.
     case null
@@ -112,13 +112,13 @@ public enum AnyCodableValue: Codable, Equatable, Hashable, Sendable, CustomStrin
     }
 
     /// Extracts the array value, or returns nil if this value is not an array.
-    public var arrayValue: [AnyCodableValue]? {
+    public var arrayValue: [Self]? {
         if case .array(let a) = self { return a }
         return nil
     }
 
     /// Extracts the dictionary value, or returns nil if this value is not a dictionary.
-    public var dictionaryValue: [String: AnyCodableValue]? {
+    public var dictionaryValue: [String: Self]? {
         if case .dictionary(let d) = self { return d }
         return nil
     }
@@ -168,9 +168,9 @@ public enum AnyCodableValue: Codable, Equatable, Hashable, Sendable, CustomStrin
             self = .double(d)
         } else if let s = try? container.decode(String.self) {
             self = .string(s)
-        } else if let a = try? container.decode([AnyCodableValue].self) {
+        } else if let a = try? container.decode([Self].self) {
             self = .array(a)
-        } else if let d = try? container.decode([String: AnyCodableValue].self) {
+        } else if let d = try? container.decode([String: Self].self) {
             self = .dictionary(d)
         } else {
             throw DecodingError.dataCorruptedError(

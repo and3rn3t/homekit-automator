@@ -78,7 +78,7 @@ public struct RegisteredAutomation: Codable, Identifiable, Sendable, Hashable {
         hasher.combine(id)
     }
 
-    public static func == (lhs: RegisteredAutomation, rhs: RegisteredAutomation) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id
     }
 }

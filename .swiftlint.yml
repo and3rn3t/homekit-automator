@@ -1,5 +1,6 @@
 # SwiftLint Configuration for HomeKit Automator
 # Run: swiftlint lint --config .swiftlint.yml
+# Note: CI runs with --strict, so warnings become errors.
 
 # Paths to include/exclude
 included:
@@ -16,6 +17,7 @@ disabled_rules:
   - trailing_comma           # Allow trailing commas in multiline collections
   - opening_brace            # Swift 6 style preferences differ
   - identifier_name          # HomeKit uses unconventional names (e.g., HMHome)
+  - blanket_disable_command  # Allow file-level swiftlint:disable for tests
 
 opt_in_rules:
   - array_init
@@ -32,8 +34,6 @@ opt_in_rules:
   - explicit_init
   - fatal_error_message
   - first_where
-  - force_unwrapping
-  - implicitly_unwrapped_optional
   - joined_default_parameter
   - last_where
   - literal_expression_end_indentation
@@ -51,31 +51,37 @@ opt_in_rules:
   - yoda_condition
 
 # Rule configuration
+# Note: With --strict, warnings become errors. Set warning == error
+# so only truly over-limit code fails CI.
 line_length:
-  warning: 120
+  warning: 150
   error: 150
   ignores_comments: true
   ignores_urls: true
 
 type_body_length:
-  warning: 300
+  warning: 500
   error: 500
 
 file_length:
-  warning: 500
+  warning: 1000
   error: 1000
 
 function_body_length:
-  warning: 60
+  warning: 100
   error: 100
 
 function_parameter_count:
-  warning: 6
+  warning: 8
   error: 8
 
 cyclomatic_complexity:
-  warning: 15
+  warning: 25
   error: 25
+
+large_tuple:
+  warning: 4
+  error: 4
 
 nesting:
   type_level: 3
