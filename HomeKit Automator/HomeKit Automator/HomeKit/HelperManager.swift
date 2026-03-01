@@ -39,7 +39,7 @@ final class HelperManager {
     private let restartWindowDuration: TimeInterval = 15 * 60
 
     /// Socket path used for health-check pings (defaults to Application Support directory).
-    nonisolated var socketPath: String {
+    var socketPath: String {
         SocketConstants.defaultPath
     }
 
@@ -164,7 +164,7 @@ final class HelperManager {
 
     /// Sends a simple command to the helper via Unix domain socket and returns the raw
     /// JSON response string.
-    private nonisolated func sendSocketCommand(_ command: String) async throws -> String {
+    private func sendSocketCommand(_ command: String) async throws -> String {
         let requestId = UUID().uuidString
         let token = SocketConstants.getOrCreateToken()
         let version = SocketConstants.protocolVersion

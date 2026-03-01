@@ -91,6 +91,13 @@ enum SocketConstants: Sendable {
         return result == 0
     }
 
+    /// Deletes the persisted auth token so that the next call to `getOrCreateToken()`
+    /// generates a fresh one. Used by the Debug view to force re-authentication.
+    static func resetToken() {
+        let path = tokenPath
+        try? FileManager.default.removeItem(atPath: path)
+    }
+
     /// The legacy socket path that was used before the Application Support migration.
     static let legacySocketPath = "/tmp/homekitauto.sock"
 

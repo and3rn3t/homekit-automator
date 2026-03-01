@@ -202,9 +202,9 @@ final class LLMService {
     // MARK: - API Communication
     
     /// Maximum number of retry attempts for transient failures (timeouts, rate limits, 5xx errors).
-    private static let maxRetries = 3
+    nonisolated private static let maxRetries = 3
     /// Initial backoff delay between retries (doubles each attempt).
-    private static let initialBackoffSeconds: TimeInterval = 1.0
+    nonisolated private static let initialBackoffSeconds: TimeInterval = 1.0
     
     private nonisolated func sendRequest(system: String, user: String) async throws -> String {
         var lastError: Error?
@@ -390,11 +390,11 @@ final class LLMService {
         let deviceMap = try await HelperAPIClient.shared.getDeviceMap()
         
         var context = ""
-        for home in deviceMap.homes {
+        for home in deviceMap.homes ?? [] {
             context += "Home: \(home.name)\n"
-            for accessory in home.accessories {
+            for accessory in home.accessories ?? [] {
                 let room = accessory.room ?? "No Room"
-                let chars = accessory.characteristics.map { $0.name }.joined(separator: ", ")
+                let chars = (accessory.characteristics ?? []).map { $0.name }.joined(separator: ", ")
                 context += "  - \(accessory.name) (\(room)) — \(chars)\n"
             }
         }

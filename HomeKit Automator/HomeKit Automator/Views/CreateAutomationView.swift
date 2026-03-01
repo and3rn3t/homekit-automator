@@ -84,6 +84,8 @@ struct CreateAutomationView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .accessibilityIdentifier(AccessibilityID.Create.errorMessage)
                 }
+
+                if !llmEnabled {
                     HStack(spacing: 8) {
                         Image(systemName: "info.circle.fill")
                             .foregroundStyle(.blue)
@@ -175,7 +177,7 @@ struct CreateAutomationView: View {
                 }
 
                 // Create LLM service
-                guard let service = await LLMService() else {
+                guard let service = LLMService() else {
                     errorMessage = "LLM service not configured. Please set up your API key in Settings."
                     return
                 }

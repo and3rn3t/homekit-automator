@@ -240,7 +240,7 @@ final class HelperAPIClient {
     ///   - command: Structured command name (e.g., "discover", "set_device")
     ///   - params: Optional typed parameters dictionary
     /// - Returns: Response JSON string from the helper
-    private nonisolated func sendCommand(_ command: String, params: [String: AnyCodableValue]? = nil) async throws -> String {
+    private func sendCommand(_ command: String, params: [String: AnyCodableValue]? = nil) async throws -> String {
         let requestId = UUID().uuidString
         let token = SocketConstants.getOrCreateToken()
         let version = SocketConstants.protocolVersion
@@ -440,7 +440,6 @@ enum HelperAPIError: LocalizedError {
         case .decodingFailed: return "Failed to decode response"
         case .helperNotRunning: return "HomeKitHelper is not running"
         case .serverError(let message): return "HomeKitHelper error: \(message)"
-        }
         }
     }
 }

@@ -268,7 +268,7 @@ struct LLMSettingsTab: View {
             defer { isTestingConnection = false }
 
             do {
-                guard let service = await LLMService() else {
+                guard let service = LLMService() else {
                     testResult = "✗ Configuration invalid"
                     return
                 }
