@@ -47,7 +47,7 @@ HomeKit Automator integrates deeply with your smart home. Please be aware of the
 If you discover a security vulnerability in HomeKit Automator, please report it privately:
 
 1. **Do not** open a public GitHub issue for security vulnerabilities
-2. Email the maintainer directly at: `and3rn3t` via GitHub (or open a draft security advisory)
+2. Contact the maintainer via GitHub (username `and3rn3t`), or open a draft security advisory on this repository
 3. Include:
    - A description of the vulnerability
    - Steps to reproduce
