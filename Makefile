@@ -100,7 +100,7 @@ dev: clean build test lint
 # Sync models
 sync-models:
 	@echo "==> Syncing models..."
-	./scripts/sync-models.sh
+	./scripts/sync-models.sh --update
 
 # Check models sync
 check-models:
