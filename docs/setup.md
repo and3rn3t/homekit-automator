@@ -31,7 +31,10 @@ This guide walks through every step of installing, configuring, and verifying Ho
 **Important:** You must install the full **Xcode.app** from the App Store, not just the Command Line Tools. The XCTest framework is required for running tests and is only available in the full Xcode installation. After installing Xcode, run:
 
 ```bash
-sudo xcode-select --switch /Applications/Xcode.app
+# Point xcode-select at the Xcode Developer directory
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+# You can verify or discover the current path with:
+# xcode-select -p
 ```
 
 Additional requirements:
