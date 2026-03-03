@@ -1,6 +1,6 @@
 # HomeKit Automator
 
-[![CI](https://github.com/homekit-automator/homekit-automator/actions/workflows/ci.yml/badge.svg)](https://github.com/homekit-automator/homekit-automator/actions/workflows/ci.yml)
+[![CI](https://github.com/and3rn3t/homekit-automator/actions/workflows/ci.yml/badge.svg)](https://github.com/and3rn3t/homekit-automator/actions/workflows/ci.yml)
 
 A comprehensive Apple HomeKit smart home automation skill for [OpenClaw](https://openclaw.ai) and Claude. Control devices, create complex automations via natural conversation, and register them as native Apple Shortcuts so they run reliably on schedule — even when the AI agent isn't active.
 
@@ -52,7 +52,19 @@ For a detailed architecture walkthrough, see [docs/architecture.md](docs/archite
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Install via ClawHub (Easiest)
+
+If you're using OpenClaw, install directly from ClawHub:
+
+```bash
+clawhub install homekit-automator
+```
+
+This will handle the Homebrew formula installation and OpenClaw plugin configuration automatically.
+
+### Option 2: Manual Build
+
+#### Prerequisites
 
 - macOS 14.0 (Sonoma) or later
 - Xcode 16+ with Swift 6.0
@@ -61,10 +73,10 @@ For a detailed architecture walkthrough, see [docs/architecture.md](docs/archite
 - Apple Developer account (free tier works, but you need HomeKit capability)
 - At least one HomeKit-compatible device configured in Apple Home
 
-### Build
+#### Build
 
 ```bash
-git clone https://github.com/homekit-automator/homekit-automator.git
+git clone https://github.com/and3rn3t/homekit-automator.git
 cd homekit-automator
 
 # Set your Apple Developer team ID

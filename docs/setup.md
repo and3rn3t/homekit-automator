@@ -89,7 +89,7 @@ HomeKit Automator.app separately for the HomeKit bridge component (see Option B 
 
 ```bash
 # Clone the repository
-git clone https://github.com/homekit-automator/homekit-automator.git
+git clone https://github.com/and3rn3t/homekit-automator.git
 cd homekit-automator
 
 # Set your team ID (from Step 2 above)

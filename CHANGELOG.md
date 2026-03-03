@@ -5,6 +5,38 @@ All notable changes to HomeKit Automator are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-02
+
+### Added
+
+- **clawhub.json** — ClawHub skill manifest for easy installation via `clawhub install homekit-automator`
+- **SKILL.md** in root — OpenClaw skill definition (previously only in `docs/skill.md`)
+- **SECURITY.md** — Security policy, vulnerability reporting guidelines, and best practices
+- **Makefile** — Unified build, test, and lint targets for streamlined development workflow
+  - `make test` — Run all tests (Swift + MCP + evals)
+  - `make lint` — Run all linters (SwiftLint + shellcheck)
+  - `make build-release` — Build optimized release version
+  - `make install` — Build and install to /Applications
+  - `make dev` — Full development cycle (clean, build, test, lint)
+
+### Changed
+
+- **README.md** — Added ClawHub installation instructions as the primary/easiest installation method
+- **README.md** — Reorganized Quick Start section to show `clawhub install homekit-automator` first
+- **test-automation-flow.sh** — Improved shell script safety with `set -euo pipefail` (was `set -e`)
+- All version references updated to 1.2.0 across SKILL.md, docs/skill.md, and clawhub.json
+
+### Improved
+
+- **Documentation** — Clearer quickstart flow for new users
+- **Developer Experience** — Makefile targets reduce friction for testing and linting
+- **Security Posture** — SECURITY.md provides clear vulnerability reporting guidelines
+- **Distribution** — ClawHub integration makes installation one command instead of many
+
+### Fixed
+
+- Shell script error handling in `test-automation-flow.sh` (added `pipefail` and `nounset` flags)
+
 ## [1.1.1] - 2026-03-01
 
 ### Fixed
