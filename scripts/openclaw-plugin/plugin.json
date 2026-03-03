@@ -1,6 +1,6 @@
 {
   "name": "homekit-automator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Smart HomeKit automation with natural language — control devices, create automations registered as Apple Shortcuts, get energy insights and suggestions. Multi-home support, full validation pipeline, condition evaluation, and structured logging.",
   "author": "homekit-automator",
   "license": "MIT",

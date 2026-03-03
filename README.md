@@ -67,7 +67,10 @@ This will handle the Homebrew formula installation and OpenClaw plugin configura
 #### Prerequisites
 
 - macOS 14.0 (Sonoma) or later
-- Xcode 16+ with Swift 6.0
+- **Xcode 16+** (full Xcode.app from the App Store, not just Command Line Tools)
+  - Command Line Tools alone will **not work** — XCTest framework is required for tests
+  - After installing Xcode, run: `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`
+- Swift 6.0 (included with Xcode 16+)
 - XcodeGen (`brew install xcodegen`)
 - Node.js 20+
 - Apple Developer account (free tier works, but you need HomeKit capability)

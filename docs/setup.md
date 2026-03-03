@@ -21,12 +21,21 @@ This guide walks through every step of installing, configuring, and verifying Ho
 | Requirement | Minimum | Recommended |
 |------------|---------|-------------|
 | macOS | 14.0 (Sonoma) | 15.0+ (Sequoia) |
-| Xcode | 16.0 | 16.2+ |
+| Xcode | 16.0 (full Xcode.app) | 16.2+ |
 | Swift | 6.0 | 6.0+ |
 | Node.js | 20.0 | 22 LTS |
 | XcodeGen | 2.38 | Latest |
 | RAM | 4 GB | 8 GB+ |
 | Disk | 500 MB | 1 GB |
+
+**Important:** You must install the full **Xcode.app** from the App Store, not just the Command Line Tools. The XCTest framework is required for running tests and is only available in the full Xcode installation. After installing Xcode, run:
+
+```bash
+# Point xcode-select at the Xcode Developer directory
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+# You can verify or discover the current path with:
+# xcode-select -p
+```
 
 Additional requirements:
 

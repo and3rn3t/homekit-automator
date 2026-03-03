@@ -368,11 +368,11 @@ struct HelperAPIResponseTests {
 
     @Test func statusResponseDecoding() throws {
         let json = """
-        {"status": "ok", "version": "1.1.0", "uptime": 3600.5}
+        {"status": "ok", "version": "1.2.0", "uptime": 3600.5}
         """
         let response = try JSONDecoder().decode(StatusResponse.self, from: Data(json.utf8))
         #expect(response.status == "ok")
-        #expect(response.version == "1.1.0")
+        #expect(response.version == "1.2.0")
         #expect(response.uptime == 3600.5)
     }
 
