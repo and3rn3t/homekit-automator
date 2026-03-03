@@ -1,0 +1,55 @@
+{
+  "name": "homekit-automator",
+  "version": "1.2.0",
+  "description": "Full-featured Apple HomeKit smart home automation skill for macOS. Create, manage, and trigger complex home automations through natural conversation — lights, thermostats, locks, sensors, scenes, and more. Automations are registered as native Apple Shortcuts so they run reliably on schedule even when the AI agent isn't active.",
+  "author": {
+    "name": "Matt",
+    "github": "and3rn3t"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/and3rn3t/homekit-automator.git"
+  },
+  "homepage": "https://github.com/and3rn3t/homekit-automator",
+  "keywords": [
+    "homekit",
+    "smart-home",
+    "automation",
+    "apple-home",
+    "shortcuts",
+    "iot",
+    "lights",
+    "thermostat",
+    "locks",
+    "sensors",
+    "scenes",
+    "macos",
+    "mcp"
+  ],
+  "category": "productivity",
+  "emoji": "🏠",
+  "openclaw": {
+    "minVersion": "0.1.0"
+  },
+  "requires": {
+    "os": ["macos"],
+    "bins": ["homekitauto"],
+    "env": []
+  },
+  "install": {
+    "homebrew": {
+      "formula": "and3rn3t/homekit-automator/homekit-automator",
+      "tap": "and3rn3t/homekit-automator"
+    },
+    "postInstall": [
+      "echo 'HomeKit Automator installed!'",
+      "echo 'Next steps:'",
+      "echo '  1. Launch HomeKit Automator from /Applications'",
+      "echo '  2. Grant HomeKit access when prompted'",
+      "echo '  3. Configure your OpenClaw integration'",
+      "echo ''",
+      "echo 'For OpenClaw: openclaw plugins install homekit-automator'"
+    ]
+  }
+}

@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # test-automation-flow.sh
 # Script to test the HomeKit Automator app end-to-end
 
-set -e
+set -euo pipefail
 
 echo "🧪 HomeKit Automator - Test Script"
 echo "=================================="

@@ -4,7 +4,7 @@
   "description": "Smart HomeKit automation with natural language — control devices, create automations registered as Apple Shortcuts, get energy insights and suggestions. Multi-home support, full validation pipeline, condition evaluation, and structured logging.",
   "author": "homekit-automator",
   "license": "MIT",
-  "homepage": "https://github.com/homekit-automator/homekit-automator",
+  "homepage": "https://github.com/and3rn3t/homekit-automator",
   "platforms": ["macos"],
   "minOsVersion": "14.0",
   "skills": [
