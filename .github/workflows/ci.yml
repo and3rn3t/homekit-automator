@@ -10,7 +10,7 @@ jobs:
   build-and-test:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Swift
         uses: swift-actions/setup-swift@v2
@@ -50,7 +50,7 @@ jobs:
   xcode-build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install XcodeGen
         run: brew install xcodegen
