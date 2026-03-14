@@ -29,7 +29,7 @@ let package = Package(
     ],
     dependencies: [
         // CLI framework: provides @Argument, @Option, @Flag, and subcommand routing
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
         // Structured logging framework (available for diagnostic output)
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     ],
