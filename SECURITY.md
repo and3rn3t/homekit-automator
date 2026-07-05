@@ -44,17 +44,18 @@ HomeKit Automator integrates deeply with your smart home. Please be aware of the
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in HomeKit Automator, please report it privately:
+**Please do NOT report security vulnerabilities through public GitHub issues.**
 
-1. **Do not** open a public GitHub issue for security vulnerabilities
-2. Contact the maintainer via GitHub (username `and3rn3t`), or open a draft security advisory on this repository
-3. Include:
-   - A description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Any suggested fixes (optional)
+Report them privately via GitHub's "Report a vulnerability" (Security tab) on this repository, or email **and3rn3t@icloud.com**.
 
-We aim to respond to security reports within 48 hours. If the vulnerability is confirmed, we will:
+Include:
+- A description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Affected versions
+- Any suggested fixes or known mitigations (optional)
+
+You should receive a response within 7 days. If the vulnerability is confirmed, we will:
 
 1. Develop and test a fix
 2. Release a patch version as soon as possible
